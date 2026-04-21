@@ -1,15 +1,14 @@
-import { type NextRequest } from 'next/server'
+import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 
-export async function middleware(request: NextRequest) {
-  const { response, supabase } = await updateSession(request)
+export async function proxy(request: NextRequest) {
+  const { supabaseResponse, supabase } = await updateSession(request)
   
-  if (!supabase) return response
+  if (!supabase) return supabaseResponse
 
   const { data: { user } } = await supabase.auth.getUser()
 
   // Protect routes under (dashboard)
-  // Since they are in a group, we check if they are NOT /login or /
   const isAuthPage = request.nextUrl.pathname.startsWith('/login')
   const isLandingPage = request.nextUrl.pathname === '/'
   const isPublicFile = request.nextUrl.pathname.includes('.')
@@ -18,7 +17,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  return response
+  return supabaseResponse
 }
 
 export const config = {

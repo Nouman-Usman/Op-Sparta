@@ -1,181 +1,178 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { 
   ArrowLeft, 
-  Globe, 
-  Palette, 
-  Users, 
-  MessageSquare, 
-  Zap,
+  Plus,
+  Loader2,
   CheckCircle2,
-  ChevronRight,
-  Sparkles
+  Sparkles,
+  Zap,
+  Globe,
+  MessageSquare,
+  Users,
+  Palette,
+  ArrowRight
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createProject } from "@/app/actions/projects";
 import { cn } from "@/lib/utils";
 
-const steps = [
-  { id: "product", name: "Product", icon: Globe, description: "What are we promoting?" },
-  { id: "brand", name: "Brand Kit", icon: Palette, description: "Visual identity & style" },
-  { id: "audience", name: "Audience", icon: Users, description: "Who is this for?" },
-  { id: "tone", name: "Tone", icon: MessageSquare, description: "Voice & personality" },
+const STEPS = [
+  { id: "brand", name: "Brand Info", icon: Globe, description: "Your product or service" },
+  { id: "context", name: "Strategy", icon: TargetIcon, description: "Audience & Tone" },
+  { id: "visual", name: "Visuals", icon: Palette, description: "Colors & Style" },
 ];
 
+function TargetIcon(props: any) {
+  return (
+    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+  );
+}
+
 export default function NewProjectPage() {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
-    productUrl: "",
-    productDescription: "",
-    brandColors: "",
+    name: "",
+    industry: "",
     targetAudience: "",
-    tone: "professional",
+    brandVoice: "",
   });
 
-  const nextStep = () => setCurrentStep((prev) => Math.min(prev + 1, steps.length - 1));
-  const prevStep = () => setCurrentStep((prev) => Math.max(prev - 1, 0));
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name) return;
+
+    startTransition(async () => {
+      const result = await createProject({
+        name: formData.name,
+        industry: formData.industry,
+        targetAudience: formData.targetAudience,
+        brandVoice: formData.brandVoice,
+      });
+
+      if (result.success) {
+        router.push(`/studio?projectId=${result.projectId}`);
+      } else {
+        alert(result.error || "Failed to create project");
+      }
+    });
+  };
 
   return (
     <div className="p-8 max-w-4xl mx-auto w-full">
       <Link 
-        href="/" 
-        className="flex items-center gap-2 text-muted-foreground hover:text-white transition-colors mb-8 group w-fit"
+        href="/overview"
+        className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-8 group w-fit"
       >
         <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
         Back to Dashboard
       </Link>
 
       <div className="mb-12">
-        <h1 className="text-4xl font-bold tracking-tight text-white mb-3">Create New Project</h1>
-        <p className="text-muted-foreground text-lg">Let&apos;s set up your brand identity for AI generation.</p>
+        <h1 className="text-5xl font-extrabold tracking-tight text-white mb-4 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">
+          New Brand Engine
+        </h1>
+        <p className="text-zinc-400 text-lg">Define your brand identity to power our AI supervision layer.</p>
       </div>
 
-      {/* Stepper */}
-      <div className="flex items-center justify-between mb-12 relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-border -translate-y-1/2 -z-10" />
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const isActive = index === currentStep;
-          const isCompleted = index < currentStep;
-
-          return (
-            <div key={step.id} className="flex flex-col items-center gap-3 bg-background px-4">
-              <div 
-                className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center border-2 transition-all duration-300",
-                  isActive ? "border-accent bg-accent/10 text-accent shadow-[0_0_15px_rgba(var(--accent),0.3)]" : 
-                  isCompleted ? "border-emerald-500 bg-emerald-500 text-white" : 
-                  "border-border bg-muted text-muted-foreground"
-                )}
-              >
-                {isCompleted ? <CheckCircle2 size={24} /> : <Icon size={22} />}
-              </div>
-              <div className="text-center">
-                <p className={cn("text-xs font-bold uppercase tracking-wider", isActive ? "text-accent" : "text-muted-foreground")}>
-                  {step.name}
-                </p>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Form Content */}
-      <div className="glass-dark rounded-3xl p-8 border border-border shadow-2xl min-h-[400px] flex flex-col">
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-white mb-2">{steps[currentStep].name}</h2>
-          <p className="text-muted-foreground">{steps[currentStep].description}</p>
-        </div>
-
-        <div className="flex-1">
-          {currentStep === 0 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+        <div className="lg:col-span-2">
+          <form onSubmit={handleSubmit} className="space-y-8 glass-dark p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
+            <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Product URL (Optional)</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Name</label>
                 <input 
-                  type="url" 
-                  placeholder="https://yourproduct.com"
-                  className="w-full bg-muted/30 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
-                  value={formData.productUrl}
-                  onChange={(e) => setFormData({ ...formData, productUrl: e.target.value })}
+                  type="text" 
+                  placeholder="e.g. Tesla Cybergear"
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  required
                 />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Industry</label>
+                  <input 
+                    type="text" 
+                    placeholder="e.g. Personal Audio"
+                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
+                    value={formData.industry}
+                    onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Voice</label>
+                    <select 
+                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all appearance-none"
+                      value={formData.brandVoice}
+                      onChange={(e) => setFormData({ ...formData, brandVoice: e.target.value })}
+                    >
+                      <option value="minimalist">Minimalist</option>
+                      <option value="aggressive">Aggressive & Bold</option>
+                      <option value="luxury">Luxury & Elegant</option>
+                      <option value="funny">Entertaining & Viral</option>
+                    </select>
+                </div>
+              </div>
+
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground">Product Description</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Target Audience</label>
                 <textarea 
-                  placeholder="Describe your product, its features, and main benefits..."
-                  rows={5}
-                  className="w-full bg-muted/30 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all resize-none"
-                  value={formData.productDescription}
-                  onChange={(e) => setFormData({ ...formData, productDescription: e.target.value })}
+                  placeholder="e.g. Tech enthusiasts aged 18-35 who value performance over price..."
+                  rows={4}
+                  className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all resize-none"
+                  value={formData.targetAudience}
+                  onChange={(e) => setFormData({ ...formData, targetAudience: e.target.value })}
                 />
               </div>
             </div>
-          )}
 
-          {currentStep === 1 && (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Primary Brand Color</label>
-                  <div className="flex gap-2">
-                    <input 
-                      type="color" 
-                      className="w-12 h-12 rounded-lg bg-transparent border-none cursor-pointer"
-                    />
-                    <input 
-                      type="text" 
-                      placeholder="#000000"
-                      className="flex-1 bg-muted/30 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">Brand Style</label>
-                  <select className="w-full bg-muted/30 border border-border rounded-xl px-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all">
-                    <option>Minimalist</option>
-                    <option>Vibrant & Bold</option>
-                    <option>Professional & Corporate</option>
-                    <option>Luxury & Elegant</option>
-                  </select>
-                </div>
-              </div>
-              <div className="p-6 rounded-2xl bg-accent/5 border border-accent/20 flex items-start gap-4">
-                <Sparkles className="text-accent shrink-0" />
-                <p className="text-sm text-accent/80 italic">
-                  Tip: Uploading a logo or brand kit will help the AI maintain consistency across all generated creatives.
-                </p>
-              </div>
-            </div>
-          )}
-
-          {currentStep > 1 && (
-             <div className="flex flex-col items-center justify-center py-12 text-center space-y-4">
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                  <Zap size={32} />
-                </div>
-                <h3 className="text-xl font-semibold text-white">More options coming soon</h3>
-                <p className="text-muted-foreground max-w-xs">We&apos;re finalizing the Audience and Tone analysis modules.</p>
-             </div>
-          )}
+            <button 
+              type="submit" 
+              disabled={isPending || !formData.name}
+              className="w-full bg-white text-black py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {isPending ? <Loader2 className="animate-spin" /> : <>Initialize Project <ArrowRight size={18} /></>}
+            </button>
+          </form>
         </div>
 
-        <div className="mt-12 flex items-center justify-between pt-8 border-t border-border">
-          <button 
-            onClick={prevStep}
-            disabled={currentStep === 0}
-            className="px-6 py-2.5 rounded-xl text-muted-foreground hover:text-white hover:bg-muted transition-all disabled:opacity-0"
-          >
-            Previous
-          </button>
-          
-          <button 
-            onClick={currentStep === steps.length - 1 ? () => {} : nextStep}
-            className="flex items-center gap-2 bg-accent hover:bg-accent/90 text-accent-foreground px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-accent/20 active:scale-[0.98]"
-          >
-            {currentStep === steps.length - 1 ? "Finish & Generate" : "Continue"}
-            <ChevronRight size={18} />
-          </button>
+        <div className="space-y-6">
+          <div className="glass-dark border border-white/5 p-8 rounded-[2.5rem]">
+            <h3 className="text-white font-bold mb-4 flex items-center gap-2">
+              <Sparkles size={18} className="text-accent" />
+              SaaS Engine Pro
+            </h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              When you initialize a project, our AI 10.0 supervisor creates a brand kit specifically for this niche. Every n8n generation will follow these rules.
+            </p>
+            <div className="mt-6 space-y-3">
+              {[
+                "Global n8n Workflow sync",
+                "Automated Instagram Discovery",
+                "Brand voice enforcement",
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-2 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
+                  <CheckCircle2 size={12} className="text-accent" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-8 rounded-[2.5rem] bg-indigo-600/10 border border-indigo-600/20">
+             <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center mb-4 text-white">
+                <Zap size={20} fill="currentColor" />
+             </div>
+             <h4 className="text-white font-bold mb-1">Instant Generation</h4>
+             <p className="text-[10px] text-zinc-500 uppercase font-black tracking-widest">Post-setup trigger</p>
+          </div>
         </div>
       </div>
     </div>

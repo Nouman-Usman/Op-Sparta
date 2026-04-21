@@ -116,7 +116,7 @@ export default function LoginPage() {
               <div className="flex justify-between items-center px-1">
                 <label className="text-[10px] font-bold text-zinc-400 uppercase tracking-[0.2em]">Password</label>
                 {isLogin && (
-                  <Link href="/forgot-password" size="sm" className="text-xs text-accent hover:text-accent/80 transition-colors font-medium">
+                  <Link href="/forgot-password" className="text-xs text-accent hover:text-accent/80 transition-colors font-medium">
                     Forgot Password?
                   </Link>
                 )}

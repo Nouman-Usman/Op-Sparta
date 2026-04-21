@@ -13,8 +13,8 @@ export async function GET(request: Request) {
   }
 
   try {
-    const appId = process.env.NEXT_PUBLIC_INSTAGRAM_CLIENT_ID;
-    const appSecret = process.env.INSTAGRAM_CLIENT_SECRET;
+    const appId = process.env.INSTAGRAM_APP_ID;
+    const appSecret = process.env.INSTAGRAM_APP_SECRET;
     const redirectUri = process.env.INSTAGRAM_REDIRECT_URI;
 
     // 1. Exchange code for short-lived token
@@ -41,8 +41,15 @@ export async function GET(request: Request) {
     );
     const accountsData = await accountsResponse.json();
     
+    // Check if Meta explicitly returned an error (e.g., missing permissions, token invalid)
+    if (accountsData.error) {
+      console.error("Meta API Accounts Error:", accountsData.error);
+      throw new Error(`Meta API Error: ${accountsData.error.message}`);
+    }
+
     if (!accountsData.data || accountsData.data.length === 0) {
-      throw new Error("No Facebook Pages were found linked to this account. Ensure you selected your Page in the login popup.");
+      console.error("Empty accounts data:", accountsData);
+      throw new Error("No Facebook Pages were found linked to this account. Ensure you explicitly selected the Page during the permission checklist.");
     }
 
     const pageWithIg = accountsData.data.find((page: any) => page.instagram_business_account);
@@ -56,16 +63,26 @@ export async function GET(request: Request) {
 
     // 4. Save to Database
     const supabase = await createClient();
+    if (!supabase) throw new Error("Supabase auth configuration failed");
+
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) throw new Error("User not found");
 
-    await db.update(users)
-      .set({
+    // Ensure user exists in public table via upsert
+    await db.insert(users)
+      .values({
+        id: user.id,
         instagramAccessToken: longLivedToken,
         instagramPageId: instagramBusinessId,
       })
-      .where(eq(users.id, user.id));
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          instagramAccessToken: longLivedToken,
+          instagramPageId: instagramBusinessId,
+        }
+      });
 
     return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/settings?success=instagram_connected`);
   } catch (error: any) {

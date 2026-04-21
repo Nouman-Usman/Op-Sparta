@@ -33,7 +33,12 @@ export async function saveN8nWebhook(url: string) {
   }
 }
 
-export async function saveInstagramCredentials(accessToken: string, pageId: string) {
+export async function saveInstagramCredentials(data: {
+  appId?: string;
+  appSecret?: string;
+  accessToken: string;
+  pageId: string;
+}) {
   try {
     const supabase = await createClient();
     if (!supabase) throw new Error("Auth failed");
@@ -43,8 +48,10 @@ export async function saveInstagramCredentials(accessToken: string, pageId: stri
 
     await db.update(users)
       .set({ 
-        instagramAccessToken: accessToken,
-        instagramPageId: pageId
+        instagramAppId: data.appId,
+        instagramAppSecret: data.appSecret,
+        instagramAccessToken: data.accessToken,
+        instagramPageId: data.pageId
       })
       .where(eq(users.id, user.id));
 
@@ -66,6 +73,8 @@ export async function getIntegrations() {
 
     const [userData] = await db.select({
       n8nGenerationWebhook: users.n8nGenerationWebhook,
+      instagramAppId: users.instagramAppId,
+      instagramAppSecret: users.instagramAppSecret,
       instagramAccessToken: users.instagramAccessToken,
       instagramPageId: users.instagramPageId
     })

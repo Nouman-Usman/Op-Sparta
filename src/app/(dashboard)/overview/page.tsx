@@ -11,7 +11,9 @@ import {
   MoreVertical
 } from "lucide-react";
 import Link from "next/link";
-import Image from "next/image";
+import { db } from "@/db";
+import { projects as projectsTable } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export default async function OverviewPage() {
   const supabase = await createClient();
@@ -20,39 +22,11 @@ export default async function OverviewPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return redirect("/login");
 
-  // Mock projects data (In a real app, this would come from the database)
-  const projects = [
-    {
-      id: "1",
-      name: "Tesla Brand Campaign",
-      industry: "Automotive",
-      status: "Active",
-      postsCount: 12,
-      engagement: "+24%",
-      image: "https://images.unsplash.com/photo-1560958089-b8a1929cea89?auto=format&fit=crop&q=80&w=800",
-      lastActive: "2h ago"
-    },
-    {
-      id: "2",
-      name: "Apple One Vision",
-      industry: "Tech",
-      status: "Processing",
-      postsCount: 8,
-      engagement: "+15%",
-      image: "https://images.unsplash.com/photo-1491933382434-500287f9b54b?auto=format&fit=crop&q=80&w=800",
-      lastActive: "Just now"
-    },
-    {
-      id: "3",
-      name: "Nike Run Club",
-      industry: "Fitness",
-      status: "Active",
-      postsCount: 45,
-      engagement: "+32%",
-      image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&q=80&w=800",
-      lastActive: "5h ago"
-    }
-  ];
+  // Fetch real projects for this user
+  const userProjects = await db
+    .select()
+    .from(projectsTable)
+    .where(eq(projectsTable.userId, user.id));
 
   return (
     <div className="p-8 space-y-10">
@@ -107,25 +81,22 @@ export default async function OverviewPage() {
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
             Active Projects 
             <span className="text-xs font-medium bg-white/5 px-2 py-1 rounded-full text-zinc-500">
-              {projects.length}
+              {userProjects.length}
             </span>
           </h2>
           <button className="text-sm text-zinc-400 hover:text-white transition-colors">View all projects</button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {projects.map((project) => (
+          {userProjects.map((project) => (
             <div key={project.id} className="group glass-dark rounded-[2.5rem] overflow-hidden border border-white/5 hover:border-accent/20 transition-all">
-              <div className="relative h-48 w-full overflow-hidden">
-                <Image 
-                  src={project.image} 
-                  alt={project.name}
-                  fill
-                  className="object-cover group-hover:scale-110 transition-transform duration-700"
-                />
+              <div className="relative h-48 w-full overflow-hidden bg-white/5 flex items-center justify-center">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                 <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-white uppercase tracking-widest">
-                  {project.industry}
+                  {project.industry || 'General'}
+                </div>
+                <div className="text-zinc-700">
+                  <Sparkles size={48} />
                 </div>
               </div>
               
@@ -136,33 +107,26 @@ export default async function OverviewPage() {
                       {project.name}
                     </h3>
                     <div className="flex items-center gap-2 mt-2">
-                      <div className={`w-1.5 h-1.5 rounded-full ${project.status === 'Active' ? 'bg-emerald-500' : 'bg-amber-500 animate-pulse'}`} />
-                      <span className="text-xs text-zinc-500 font-medium">{project.status}</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      <span className="text-xs text-zinc-500 font-medium">Active</span>
                     </div>
                   </div>
-                  <button className="p-2 hover:bg-white/5 rounded-lg transition-colors text-zinc-500">
-                    <MoreVertical size={20} />
-                  </button>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4 py-4 border-y border-white/5 my-4">
+                <div className="grid grid-cols-1 gap-4 py-4 border-y border-white/5 my-4">
                   <div>
-                    <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Assets</p>
-                    <p className="text-white font-bold">{project.postsCount}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Growth</p>
-                    <p className="text-emerald-500 font-bold">{project.engagement}</p>
+                    <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-widest mb-1">Brand Voice</p>
+                    <p className="text-white font-bold capitalize">{project.brandVoice || 'Minimalist'}</p>
                   </div>
                 </div>
 
                 <Link 
-                  href={`/projects/${project.id}`}
+                  href={`/studio?projectId=${project.id}`}
                   className="w-full flex items-center justify-between group/btn text-sm font-bold text-zinc-400 hover:text-white transition-colors pt-2"
                 >
                   <span className="flex items-center gap-2 text-xs">
-                    <Clock size={14} />
-                    Last update {project.lastActive}
+                    <Zap size={14} />
+                    Open Content Studio
                   </span>
                   <div className="h-8 w-8 rounded-full bg-white/5 flex items-center justify-center group-hover/btn:bg-accent group-hover/btn:text-black transition-all">
                     <ArrowUpRight size={16} />

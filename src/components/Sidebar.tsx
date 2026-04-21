@@ -18,6 +18,7 @@ const navigation = [
   { name: "Content Studio", href: "/studio", icon: Sparkles },
   { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Test Publisher", href: "/test-post", icon: Zap }, // New shortcut
 ];
 
 const secondaryNavigation = [

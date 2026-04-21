@@ -67,7 +67,7 @@ export default function LandingPage() {
   }, [router]);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-black text-white">
+    <div className="relative min-h-screen overflow-hidden bg-black text-white" suppressHydrationWarning>
       {/* Background Gradient */}
       <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_50%_0%,_#1e3a8a_0%,_transparent_50%)] opacity-30 pointer-events-none" />
 
