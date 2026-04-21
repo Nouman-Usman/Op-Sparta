@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 import { 
   LayoutDashboard, 
   Sparkles, 
@@ -9,9 +10,12 @@ import {
   BarChart3, 
   Settings, 
   PlusCircle,
-  Zap
+  Zap,
+  LogOut,
+  Loader2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createClient } from "@/utils/supabase/client";
 
 const navigation = [
   { name: "Dashboard", href: "/overview", icon: LayoutDashboard },
@@ -27,6 +31,18 @@ const secondaryNavigation = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    const supabase = createClient();
+    if (supabase) {
+      await supabase.auth.signOut();
+    }
+    router.push("/");
+    router.refresh();
+  };
 
   return (
     <div className="flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0">
@@ -84,13 +100,19 @@ export function Sidebar() {
           </Link>
         ))}
         
-        <div className="mt-4 p-4 rounded-xl bg-muted/50 border border-border/50">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Usage</p>
-          <div className="h-1.5 w-full bg-border rounded-full overflow-hidden">
-            <div className="h-full bg-accent w-[65%]" />
-          </div>
-          <p className="text-[10px] text-muted-foreground mt-2">13/20 posts generated this month</p>
-        </div>
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          disabled={loggingOut}
+          className="mt-3 w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-zinc-500 hover:bg-red-500/10 hover:text-red-400 transition-all group disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loggingOut ? (
+            <Loader2 size={18} className="animate-spin text-red-400" />
+          ) : (
+            <LogOut size={18} className="group-hover:text-red-400 transition-colors" />
+          )}
+          <span className="font-medium text-sm">{loggingOut ? "Signing out..." : "Sign Out"}</span>
+        </button>
       </div>
     </div>
   );

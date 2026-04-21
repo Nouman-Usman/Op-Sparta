@@ -8,12 +8,23 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protect routes under (dashboard)
-  const isAuthPage = request.nextUrl.pathname.startsWith('/login')
-  const isLandingPage = request.nextUrl.pathname === '/'
-  const isPublicFile = request.nextUrl.pathname.includes('.')
+  const { pathname } = request.nextUrl
 
-  if (!user && !isAuthPage && !isLandingPage && !isPublicFile) {
+  // Define public (unauthenticated) routes
+  const isPublicRoute =
+    pathname === '/' ||
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/auth') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.includes('.')  // static files
+
+  // If logged in and hitting login page, redirect to dashboard
+  if (user && pathname.startsWith('/login')) {
+    return NextResponse.redirect(new URL('/overview', request.url))
+  }
+
+  // If not logged in and hitting a protected route, redirect to login
+  if (!user && !isPublicRoute) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
