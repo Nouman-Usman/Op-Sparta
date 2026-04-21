@@ -1,0 +1,19 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AiKey {
+  id           String   @id @default(cuid())
+  userId       String
+  provider     String   // 'openai' or 'google'
+  encryptedKey String
+  iv           String   // Initialization vector for encryption
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([userId, provider])
+}
