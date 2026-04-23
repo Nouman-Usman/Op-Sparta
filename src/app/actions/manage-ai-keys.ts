@@ -36,19 +36,6 @@ export async function toggleAiKey(id: string, active: boolean) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    if (active) {
-      // Deactivate all other keys if this one is being activated
-      // (Enforce only one active key if desired)
-      await db.update(aiKeys)
-        .set({ isActive: false })
-        .where(
-          and(
-            eq(aiKeys.userId, user.id),
-            ne(aiKeys.id, id)
-          )
-        );
-    }
-
     await db.update(aiKeys)
       .set({ isActive: active })
       .where(

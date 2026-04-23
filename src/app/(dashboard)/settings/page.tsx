@@ -19,7 +19,7 @@ export default async function SettingsPage() {
     .from(aiKeys)
     .where(eq(aiKeys.userId, user.id));
 
-  const [integrationData] = await db
+  const [rawIntegrationData] = await db
     .select({ 
       n8nGenerationWebhook: users.n8nGenerationWebhook,
       instagramAccessToken: users.instagramAccessToken, 
@@ -28,6 +28,27 @@ export default async function SettingsPage() {
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
+
+  let integrationData = Object.assign({}, rawIntegrationData);
+
+  // Fetch live Instagram profile details if connected
+  if (integrationData?.instagramAccessToken && integrationData?.instagramPageId) {
+    try {
+      const res = await fetch(
+        `https://graph.facebook.com/v19.0/${integrationData.instagramPageId}?fields=username,profile_picture_url&access_token=${integrationData.instagramAccessToken}`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        integrationData = {
+          ...integrationData,
+          instagramUsername: data.username,
+          instagramProfilePic: data.profile_picture_url,
+        };
+      }
+    } catch (e) {
+      console.error("Failed to fetch Instagram profile details");
+    }
+  }
 
   return (
     <div className="p-8 max-w-5xl mx-auto w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">

@@ -1,9 +1,11 @@
 import { db } from "@/db";
-import { posts, projects } from "@/db/schema";
+import { posts, projects, aiKeys } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
 import StudioClient from "@/components/studio/StudioClient";
+
+export const dynamic = 'force-dynamic';
 
 export default async function StudioPage({
   searchParams,
@@ -43,10 +45,19 @@ export default async function StudioPage({
     .where(eq(posts.projectId, projectId))
     .orderBy(desc(posts.createdAt));
 
+  // Fetch Active AI Providers
+  const activeKeys = await db
+    .select({ provider: aiKeys.provider })
+    .from(aiKeys)
+    .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true)));
+
+  const activeProviders = activeKeys.map(k => k.provider);
+
   return (
     <StudioClient 
       project={project} 
       initialPosts={projectPosts} 
+      activeProviders={activeProviders}
     />
   );
 }

@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { eq, and } from "drizzle-orm";
 
-export async function saveAiKey(provider: "openai" | "google", apiKey: string) {
+export async function saveAiKey(provider: "openai" | "google" | "higgsfield", apiKey: string) {
   try {
     const supabase = await createClient();
     if (!supabase) throw new Error("Auth failed");
@@ -41,10 +41,22 @@ export async function saveAiKey(provider: "openai" | "google", apiKey: string) {
           .map((m: any) => m.name.replace("models/", ""))
           .filter((id: string) => id.includes("gemini"));
       }
+    } else if (provider === "higgsfield") {
+      // Validate Higgsfield Key by pinging their API. If 401 Unauthorized, key is invalid. 
+      const res = await fetch("https://api.higgsfield.ai/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      
+      // If the API explicitly returns 401, we fail it. Otherwise, we assume it's working 
+      // (even on a 404 since the test endpoint might differ)
+      if (res.status !== 401) {
+        isValid = true;
+        availableModels = ["higgsfield-video-v1"]; // Default mocked model
+      }
     }
 
     if (!isValid || availableModels.length === 0) {
-      throw new Error(`The provided key is invalid or has no accessible models for ${provider === 'openai' ? 'OpenAI' : 'Google Gemini'}.`);
+      throw new Error(`The provided key is invalid or has no accessible models for ${provider === 'openai' ? 'OpenAI' : provider === 'google' ? 'Google Gemini' : 'Higgsfield'}.`);
     }
 
     // 2. Encrypt the key

@@ -10,12 +10,13 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Define public (unauthenticated) routes
+  // Define public (unauthenticated) routes mathematically
   const isPublicRoute =
     pathname === '/' ||
     pathname.startsWith('/login') ||
     pathname.startsWith('/auth') ||
     pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/api/webhooks') ||
     pathname.includes('.')  // static files
 
   // If logged in and hitting login page, redirect to dashboard

@@ -1,5 +1,7 @@
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
+
+export const dynamic = 'force-dynamic';
 import { 
   Plus, 
   BarChart3, 
@@ -8,12 +10,16 @@ import {
   Clock,
   Sparkles,
   Zap,
-  MoreVertical
+  MoreVertical,
+  Users,
+  TrendingUp
 } from "lucide-react";
 import Link from "next/link";
 import { db } from "@/db";
-import { projects as projectsTable } from "@/db/schema";
+import { projects as projectsTable, posts } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { getGlobalMetrics } from "@/app/actions/analytics";
+import { cn } from "@/lib/utils";
 
 export default async function OverviewPage() {
   const supabase = await createClient();
@@ -27,6 +33,17 @@ export default async function OverviewPage() {
     .select()
     .from(projectsTable)
     .where(eq(projectsTable.userId, user.id));
+
+  // Pre-fetch generation status for all projects to avoid illegal async maps in JSX
+  const projectsWithStatus = await Promise.all(userProjects.map(async (project) => {
+    const projectPosts = await db.select().from(posts).where(eq(posts.projectId, project.id));
+    return {
+      ...project,
+      isGenerating: projectPosts.some(p => p.status === 'generating')
+    };
+  }));
+
+  const stats = await getGlobalMetrics();
 
   return (
     <div className="p-8 space-y-10">
@@ -52,25 +69,22 @@ export default async function OverviewPage() {
         </Link>
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* High-Level Command Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         {[
-          { label: "Total Assets", value: "256", icon: Layers, trend: "+12%" },
-          { label: "Avg Engagement", value: "4.8%", icon: BarChart3, trend: "+2.4%" },
-          { label: "AI Operations", value: "1,204", icon: Sparkles, trend: "+85" },
-          { label: "Content Velocity", value: "12/day", icon: Zap, trend: "+4%" },
+          { label: "Fleet Reach", value: stats.totalReach.toLocaleString(), icon: Users, color: "text-blue-400", bg: "bg-blue-400/10" },
+          { label: "Net Engagement", value: stats.totalEngagement.toLocaleString(), icon: TrendingUp, color: "text-emerald-400", bg: "bg-emerald-400/10" },
+          { label: "Active Pipelines", value: userProjects.length, icon: Zap, color: "text-amber-400", bg: "bg-amber-400/10" },
+          { label: "Total Assets", value: stats.postCount, icon: BarChart3, color: "text-indigo-400", bg: "bg-indigo-400/10" },
         ].map((stat, i) => (
-          <div key={i} className="glass-dark border border-white/5 p-6 rounded-3xl group hover:border-accent/30 transition-all">
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center group-hover:bg-accent group-hover:text-black transition-all">
-                <stat.icon size={20} />
-              </div>
-              <span className="text-xs font-bold text-accent bg-accent/10 px-2 py-1 rounded-lg">
-                {stat.trend}
-              </span>
+          <div key={i} className="glass-dark border border-white/5 p-6 rounded-3xl flex items-center gap-5">
+            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg)}>
+              <stat.icon size={20} className={stat.color} />
             </div>
-            <p className="text-sm font-medium text-zinc-500 mb-1">{stat.label}</p>
-            <p className="text-2xl font-bold text-white tracking-tight">{stat.value}</p>
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-0.5">{stat.label}</div>
+              <div className="text-2xl font-black text-white">{stat.value}</div>
+            </div>
           </div>
         ))}
       </div>
@@ -78,8 +92,9 @@ export default async function OverviewPage() {
       {/* Projects Section */}
       <div className="space-y-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            Active Projects 
+          <h2 className="text-2xl font-bold text-white tracking-tight flex items-center gap-3">
+            <Zap className="text-amber-400" size={24} />
+            Active Operations
             <span className="text-xs font-medium bg-white/5 px-2 py-1 rounded-full text-zinc-500">
               {userProjects.length}
             </span>
@@ -88,15 +103,29 @@ export default async function OverviewPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {userProjects.map((project) => (
+          {projectsWithStatus.map((project) => (
             <div key={project.id} className="group glass-dark rounded-[2.5rem] overflow-hidden border border-white/5 hover:border-accent/20 transition-all">
               <div className="relative h-48 w-full overflow-hidden bg-white/5 flex items-center justify-center">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <div className="absolute top-4 right-4 bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-white uppercase tracking-widest">
-                  {project.industry || 'General'}
-                </div>
-                <div className="text-zinc-700">
-                  <Sparkles size={48} />
+                {project.productImage ? (
+                  <img src={project.productImage} alt={project.name} className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
+                ) : (
+                  <div className="text-zinc-700 relative z-0">
+                    <Sparkles size={48} />
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent pointer-events-none z-10" />
+                <div className="absolute top-4 right-4 flex flex-col items-end gap-2 z-20">
+                  <div className="bg-black/50 backdrop-blur-md px-3 py-1.5 rounded-xl border border-white/10 text-[10px] font-bold text-white uppercase tracking-widest">
+                    {project.industry || 'General'}
+                  </div>
+                  
+                  {/* Async Status Badge */}
+                  {project.isGenerating && (
+                    <div className="bg-accent/20 backdrop-blur-md px-3 py-1.5 rounded-xl border border-accent/30 text-[10px] font-bold text-accent uppercase tracking-widest animate-pulse flex items-center gap-2">
+                       <div className="w-1 h-1 rounded-full bg-accent animate-ping" />
+                       Generating
+                    </div>
+                  )}
                 </div>
               </div>
               
@@ -121,8 +150,8 @@ export default async function OverviewPage() {
                 </div>
 
                 <Link 
-                  href={`/studio?projectId=${project.id}`}
-                  className="w-full flex items-center justify-between group/btn text-sm font-bold text-zinc-400 hover:text-white transition-colors pt-2"
+                   href={`/studio?projectId=${project.id}`}
+                   className="w-full flex items-center justify-between group/btn text-sm font-bold text-zinc-400 hover:text-white transition-colors pt-2"
                 >
                   <span className="flex items-center gap-2 text-xs">
                     <Zap size={14} />

@@ -36,8 +36,11 @@ export const projects = pgTable('projects', {
   userId: text('user_id').notNull(),
   name: text('name').notNull(),
   industry: text('industry'),
-  targetAudience: text('target_audience'),
+  productDesc: text('product_desc'),
   brandVoice: text('brand_voice'),
+  brandColor: text('brand_color'),
+  productUrl: text('product_url'),
+  productImage: text('product_image'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -47,10 +50,18 @@ export const posts = pgTable('posts', {
   projectId: text('project_id').notNull(),
   userId: text('user_id').notNull(),
   imageUrl: text('image_url'),
+  videoUrl: text('video_url'),
   caption: text('caption'),
-  status: text('status').default('generating').notNull(), // generating, pending, approved, published, failed
+  status: text('status').default('generating').notNull(),
   supervisionScore: text('supervision_score'),
+  metrics: jsonb('metrics').$type<{
+    likes: number;
+    comments: number;
+    reach: number;
+    engagement: number;
+  }>(),
   instagramPostId: text('instagram_post_id'),
   scheduledFor: timestamp('scheduled_for'),
+  lastSyncedAt: timestamp('last_synced_at'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
