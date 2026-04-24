@@ -48,7 +48,8 @@ export async function approveAndPost(postId: string) {
       await db.update(posts)
         .set({ 
           status: 'published',
-          instagramPostId: result.postId 
+          instagramPostId: result.postId,
+          instagramPermalink: result.permalink
         })
         .where(eq(posts.id, postId));
 

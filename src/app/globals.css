@@ -11,7 +11,9 @@
   --color-card-foreground: var(--card-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
-  --color-ring: var(--ring);
+  --font-display: var(--font-manrope);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
 
   --radius-lg: 1rem;
   --radius-md: 0.75rem;
@@ -19,21 +21,21 @@
 }
 
 :root {
-  --background: oklch(0.1 0 0); /* Near black */
-  --foreground: oklch(0.98 0 0); /* Off white */
+  --background: #131313;
+  --foreground: #e5e2e1;
   
-  --card: oklch(0.13 0.01 250);
-  --card-foreground: oklch(0.98 0 0);
+  --card: #1c1b1b;
+  --card-foreground: #e5e2e1;
   
-  --muted: oklch(0.2 0.01 250);
-  --muted-foreground: oklch(0.6 0.01 250);
+  --muted: #201f1f;
+  --muted-foreground: #b9cac9;
   
-  --accent: oklch(0.6 0.25 250); /* Vibrant blue-indigo */
-  --accent-foreground: oklch(1 0 0);
+  --accent: #00fbfb;
+  --accent-foreground: #002020;
   
-  --border: oklch(0.2 0.01 250);
-  --input: oklch(0.2 0.01 250);
-  --ring: oklch(0.6 0.25 250);
+  --border: rgba(131, 148, 147, 0.15); /* Ghost Border */
+  --input: #353534;
+  --ring: #00fbfb;
 }
 
 @layer base {

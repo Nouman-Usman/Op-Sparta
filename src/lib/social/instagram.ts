@@ -61,7 +61,15 @@ export class InstagramService {
       const publishData = await publishResponse.json();
       if (publishData.error) throw new Error(publishData.error.message);
 
-      return { success: true, postId: publishData.id };
+      // Step 3: Fetch Permalink
+      const permalinkResponse = await fetch(`https://graph.facebook.com/v19.0/${publishData.id}?fields=permalink&access_token=${finalToken}`);
+      const permalinkData = await permalinkResponse.json();
+
+      return { 
+        success: true, 
+        postId: publishData.id,
+        permalink: permalinkData.permalink
+      };
     } catch (error: any) {
       return { success: false, error: error.message };
     }
@@ -107,7 +115,7 @@ export class InstagramService {
       const creationId = containerData.id;
 
       // Step 2: Poll video processing state before publish.
-      const maxStatusChecks = 15;
+      const maxStatusChecks = 30; // 60 seconds total
       for (let i = 0; i < maxStatusChecks; i++) {
         const statusResponse = await fetch(
           `https://graph.facebook.com/v19.0/${creationId}?fields=status_code,status&access_token=${finalToken}`
@@ -120,6 +128,8 @@ export class InstagramService {
 
         const statusCode = statusData?.status_code;
         if (statusCode === "FINISHED") {
+          // Cooldown sleep to handle eventual consistency after FINISHED
+          await new Promise((resolve) => setTimeout(resolve, 5000));
           break;
         }
 
@@ -135,7 +145,7 @@ export class InstagramService {
       }
 
       // Step 3: Publish Video (retry to handle eventual consistency)
-      const maxPublishAttempts = 3;
+      const maxPublishAttempts = 5;
       for (let attempt = 1; attempt <= maxPublishAttempts; attempt++) {
         const publishResponse = await fetch(
           `https://graph.facebook.com/v19.0/${finalId}/media_publish`,
@@ -151,7 +161,15 @@ export class InstagramService {
 
         const publishData = await publishResponse.json();
         if (!publishData.error) {
-          return { success: true, postId: publishData.id };
+          // Fetch Permalink
+          const permalinkResponse = await fetch(`https://graph.facebook.com/v19.0/${publishData.id}?fields=permalink&access_token=${finalToken}`);
+          const permalinkData = await permalinkResponse.json();
+
+          return { 
+            success: true, 
+            postId: publishData.id,
+            permalink: permalinkData.permalink
+          };
         }
 
         const message = String(publishData.error.message || "");
@@ -160,7 +178,8 @@ export class InstagramService {
           throw new Error(publishData.error.message);
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 2000));
+        // Incremental backoff for retries
+        await new Promise((resolve) => setTimeout(resolve, 3000 * attempt));
       }
 
       throw new Error("Failed to publish video to Instagram.");
@@ -179,12 +198,34 @@ export class InstagramService {
     const finalToken = userCredentials?.accessToken || this.accessToken;
 
     try {
+      // Step 1: Identify media type
+      const mediaResponse = await fetch(`https://graph.facebook.com/v19.0/${instagramPostId}?fields=media_type,like_count,comments_count&access_token=${finalToken}`);
+      const mediaData = await mediaResponse.json();
+      if (mediaData.error) throw new Error(mediaData.error.message);
+
+      const isReel = mediaData.media_type === 'VIDEO';
+      const metricsList = isReel 
+        ? 'plays,reach,saved,total_interactions' 
+        : 'engagement,reach,saved';
+
+      // Step 2: Fetch Insights
       const response = await fetch(
-        `https://graph.facebook.com/v19.0/${instagramPostId}/insights?metric=engagement,reach,saved&access_token=${finalToken}`
+        `https://graph.facebook.com/v19.0/${instagramPostId}/insights?metric=${metricsList}&access_token=${finalToken}`
       );
       const data = await response.json();
       
-      if (data.error) throw new Error(data.error.message);
+      // Some Reels might not have insights ready yet, return basic stats if so
+      if (data.error) {
+        return {
+          success: true,
+          data: {
+            likes: mediaData.like_count || 0,
+            comments: mediaData.comments_count || 0,
+            reach: 0,
+            engagement: (mediaData.like_count || 0) + (mediaData.comments_count || 0)
+          }
+        };
+      }
 
       // Map metrics
       const metrics: any = {};
@@ -192,17 +233,13 @@ export class InstagramService {
         metrics[m.name] = m.values[0].value;
       });
 
-      // Also fetch likes/comments count from basic media edge
-      const mediaResponse = await fetch(`https://graph.facebook.com/v19.0/${instagramPostId}?fields=like_count,comments_count&access_token=${finalToken}`);
-      const mediaData = await mediaResponse.json();
-
       return {
         success: true,
         data: {
           likes: mediaData.like_count || 0,
           comments: mediaData.comments_count || 0,
           reach: metrics.reach || 0,
-          engagement: (mediaData.like_count || 0) + (mediaData.comments_count || 0)
+          engagement: isReel ? metrics.total_interactions : (metrics.engagement || (mediaData.like_count + mediaData.comments_count))
         }
       };
     } catch (error: any) {

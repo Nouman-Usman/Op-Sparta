@@ -162,3 +162,80 @@ export async function triggerN8nGeneration(projectId: string, selectedProvider?:
     return { success: false, error: error.message };
   }
 }
+
+export async function deletePost(postId: string) {
+  try {
+    const supabase = await createClient();
+    if (!supabase) throw new Error("Unauthorized");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    await db.delete(posts).where(and(eq(posts.id, postId), eq(posts.userId, user.id)));
+    revalidatePath("/studio");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function regeneratePost(postId: string, projectId: string, refinementPrompt?: string) {
+  try {
+    const supabase = await createClient();
+    if (!supabase) throw new Error("Unauthorized");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    // 1. Fetch current post data context
+    const [currentPost] = await db.select().from(posts).where(eq(posts.id, postId));
+    if (!currentPost) throw new Error("Post not found");
+
+    // 2. Trigger specialized Regeneration Webhook
+    const webhookUrl = process.env.n8n_Regenerate_Webhook;
+    if (webhookUrl) {
+      await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          postId,
+          refinementPrompt: refinementPrompt || "Default Regeneration",
+          currentImageUrl: currentPost.imageUrl,
+          currentVideoUrl: currentPost.videoUrl,
+          currentCaption: currentPost.caption
+        })
+      });
+    }
+
+    // 3. Reset status to 'generating'
+    await db.update(posts)
+      .set({ 
+        status: 'generating', 
+        imageUrl: null, 
+        videoUrl: null 
+      })
+      .where(and(eq(posts.id, postId), eq(posts.userId, user.id)));
+
+    revalidatePath("/studio");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updatePostCaption(postId: string, newCaption: string) {
+  try {
+    const supabase = await createClient();
+    if (!supabase) throw new Error("Unauthorized");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    await db.update(posts)
+      .set({ caption: newCaption })
+      .where(and(eq(posts.id, postId), eq(posts.userId, user.id)));
+
+    revalidatePath("/studio");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}

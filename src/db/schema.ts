@@ -61,6 +61,7 @@ export const posts = pgTable('posts', {
     engagement: number;
   }>(),
   instagramPostId: text('instagram_post_id'),
+  instagramPermalink: text('instagram_permalink'),
   scheduledFor: timestamp('scheduled_for'),
   lastSyncedAt: timestamp('last_synced_at'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
