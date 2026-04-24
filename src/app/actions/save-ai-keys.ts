@@ -7,7 +7,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/utils/supabase/server";
 import { eq, and } from "drizzle-orm";
 
-export async function saveAiKey(provider: "openai" | "google" | "higgsfield", apiKey: string) {
+export async function saveAiKey(
+  provider: "openai" | "google" | "higgsfield",
+  apiKey: string,
+  higgsfieldAccessKey?: string
+) {
   try {
     const supabase = await createClient();
     if (!supabase) throw new Error("Auth failed");
@@ -42,9 +46,17 @@ export async function saveAiKey(provider: "openai" | "google" | "higgsfield", ap
           .filter((id: string) => id.includes("gemini"));
       }
     } else if (provider === "higgsfield") {
-      // Validate Higgsfield Key by pinging their API. If 401 Unauthorized, key is invalid. 
+      if (!higgsfieldAccessKey) {
+        throw new Error("Higgsfield Access Key is required.");
+      }
+
+      // Validate Higgsfield credentials by pinging their API.
       const res = await fetch("https://api.higgsfield.ai/v1/models", {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "x-api-key": apiKey,
+          "x-access-key": higgsfieldAccessKey,
+        },
       });
       
       // If the API explicitly returns 401, we fail it. Otherwise, we assume it's working 
@@ -59,34 +71,47 @@ export async function saveAiKey(provider: "openai" | "google" | "higgsfield", ap
       throw new Error(`The provided key is invalid or has no accessible models for ${provider === 'openai' ? 'OpenAI' : provider === 'google' ? 'Google Gemini' : 'Higgsfield'}.`);
     }
 
-    // 2. Encrypt the key
-    const { encryptedData, iv } = encrypt(apiKey);
+    // 2. Encrypt credentials
+    const payloadToEncrypt =
+      provider === "higgsfield"
+        ? JSON.stringify({ apiKey, accessKey: higgsfieldAccessKey })
+        : apiKey;
 
-    // 3. Save encrypted key to DB using Drizzle
-    await db.insert(aiKeys)
-      .values({
+    const { encryptedData, iv } = encrypt(payloadToEncrypt);
+
+    // 3. Save encrypted key to DB (works even if unique index is missing in runtime DB)
+    const [existingKey] = await db
+      .select({ id: aiKeys.id })
+      .from(aiKeys)
+      .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.provider, provider)))
+      .limit(1);
+
+    const nextConfig = {
+      defaultModel: availableModels[0],
+      enabledModels: availableModels,
+    };
+
+    if (existingKey) {
+      await db
+        .update(aiKeys)
+        .set({
+          encryptedKey: encryptedData,
+          iv,
+          isActive: true,
+          config: nextConfig,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(aiKeys.id, existingKey.id), eq(aiKeys.userId, user.id)));
+    } else {
+      await db.insert(aiKeys).values({
         userId: user.id,
         provider,
         encryptedKey: encryptedData,
         iv,
-        isActive: true, // Auto-activate new keys
-        config: {
-          defaultModel: availableModels[0], // Set first available as default
-          enabledModels: availableModels,
-        }
-      })
-      .onConflictDoUpdate({
-        target: [aiKeys.userId, aiKeys.provider],
-        set: {
-          encryptedKey: encryptedData,
-          iv,
-          config: {
-            defaultModel: availableModels[0],
-            enabledModels: availableModels,
-          },
-          updatedAt: new Date(),
-        },
+        isActive: true,
+        config: nextConfig,
       });
+    }
 
     revalidatePath("/settings");
     return { success: true };

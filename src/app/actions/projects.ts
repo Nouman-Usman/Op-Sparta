@@ -92,6 +92,7 @@ export async function triggerN8nGeneration(projectId: string, selectedProvider?:
     let gemini_api_key = "";
     let openai_api_key = "";
     let higgsfield_api_key = "";
+    let higgsfield_access_key = "";
 
     for (const key of userKeys) {
       if (key.provider === "google") {
@@ -99,7 +100,15 @@ export async function triggerN8nGeneration(projectId: string, selectedProvider?:
       } else if (key.provider === "openai") {
         openai_api_key = decrypt(key.encryptedKey, key.iv);
       } else if (key.provider === "higgsfield") {
-        higgsfield_api_key = decrypt(key.encryptedKey, key.iv);
+        const decrypted = decrypt(key.encryptedKey, key.iv);
+        try {
+          const parsed = JSON.parse(decrypted);
+          if (parsed?.apiKey) higgsfield_api_key = parsed.apiKey;
+          if (parsed?.accessKey) higgsfield_access_key = parsed.accessKey;
+        } catch {
+          // Backward compatibility with previously stored single-key records.
+          higgsfield_api_key = decrypted;
+        }
       }
     }
 
@@ -134,6 +143,7 @@ export async function triggerN8nGeneration(projectId: string, selectedProvider?:
         gemini_api_key,
         openai_api_key,
         higgsfield_api_key,
+        higgsfield_access_key,
       })
     });
 

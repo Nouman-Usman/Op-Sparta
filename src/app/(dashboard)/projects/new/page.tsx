@@ -181,20 +181,6 @@ export default function NewProjectPage() {
                   />
               </div>
 
-              <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Voice</label>
-                    <select 
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all appearance-none"
-                      value={formData.brandVoice}
-                      onChange={(e) => setFormData({ ...formData, brandVoice: e.target.value })}
-                    >
-                      <option value="minimalist">Minimalist</option>
-                      <option value="aggressive">Aggressive & Bold</option>
-                      <option value="luxury">Luxury & Elegant</option>
-                      <option value="funny">Entertaining & Viral</option>
-                    </select>
-                </div>
-
               {/* Product Image Toggle Block */}
               <div className="space-y-0">
                 <div className="flex items-center justify-between ml-1 mb-2">

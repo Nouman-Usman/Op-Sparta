@@ -34,13 +34,21 @@ export default async function OverviewPage() {
     .from(projectsTable)
     .where(eq(projectsTable.userId, user.id));
 
-  // Pre-fetch generation status for all projects to avoid illegal async maps in JSX
+  // Pre-fetch generation status for all projects; keep UI alive even if individual queries fail.
   const projectsWithStatus = await Promise.all(userProjects.map(async (project) => {
-    const projectPosts = await db.select().from(posts).where(eq(posts.projectId, project.id));
-    return {
-      ...project,
-      isGenerating: projectPosts.some(p => p.status === 'generating')
-    };
+    try {
+      const projectPosts = await db.select().from(posts).where(eq(posts.projectId, project.id));
+      return {
+        ...project,
+        isGenerating: projectPosts.some((p) => p.status === "generating"),
+      };
+    } catch (error) {
+      console.error(`OverviewPage: failed to load posts for project ${project.id}`, error);
+      return {
+        ...project,
+        isGenerating: false,
+      };
+    }
   }));
 
   const stats = await getGlobalMetrics();

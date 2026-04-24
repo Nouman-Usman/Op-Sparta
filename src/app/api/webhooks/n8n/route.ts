@@ -7,10 +7,10 @@ import { revalidatePath } from "next/cache";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    console.log("📥 [N8N Webhook Receiver] Payload received:", body);
+    // Destructure without supervisionScore to ensure it's not "shared" or processed
+    const { postId, projectId, imageUrl, videoUrl, caption } = body;
     
-    // n8n should send these mathematical fields payload directly to our listener
-    const { postId, projectId, imageUrl, videoUrl, caption, supervisionScore } = body;
+    console.log(`📥 [N8N Webhook Receiver] Payload received for Project: ${projectId}`);
 
     let targetPostId = postId;
 
@@ -36,12 +36,12 @@ export async function POST(req: Request) {
     }
 
     // Overwrite the placeholder post with the final high-computation generation assets
+    // supervisionScore is intentionally omitted as per user request to not "share" it
     const result = await db.update(posts)
       .set({
         imageUrl: imageUrl || "",
         videoUrl: videoUrl || "",
         caption: caption || "",
-        supervisionScore: String(supervisionScore || "100"),
         status: 'ready', // Elevate securely to ready state
         lastSyncedAt: new Date(),
       })

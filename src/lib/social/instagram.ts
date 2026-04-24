@@ -82,6 +82,10 @@ export class InstagramService {
     }
 
     try {
+      if (!post.videoUrl) {
+        throw new Error("Video URL is missing for this post.");
+      }
+
       // Step 1: Create Video Container
       const containerResponse = await fetch(
         `https://graph.facebook.com/v19.0/${finalId}/media`,
@@ -102,27 +106,64 @@ export class InstagramService {
 
       const creationId = containerData.id;
 
-      // Step 2: Poll for status (Videos take time to process on Meta side)
-      // For this implementation, we will wait briefly or assume the user will trigger publication manual/retry
-      // Realistically we should use a webhook, but for this SaaS we'll try a single publish attempt immediately
-      
-      // Step 3: Publish Video
-      const publishResponse = await fetch(
-        `https://graph.facebook.com/v19.0/${finalId}/media_publish`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            creation_id: creationId,
-            access_token: finalToken
-          })
+      // Step 2: Poll video processing state before publish.
+      const maxStatusChecks = 15;
+      for (let i = 0; i < maxStatusChecks; i++) {
+        const statusResponse = await fetch(
+          `https://graph.facebook.com/v19.0/${creationId}?fields=status_code,status&access_token=${finalToken}`
+        );
+        const statusData = await statusResponse.json();
+
+        if (statusData?.error) {
+          throw new Error(statusData.error.message);
         }
-      );
 
-      const publishData = await publishResponse.json();
-      if (publishData.error) throw new Error(publishData.error.message);
+        const statusCode = statusData?.status_code;
+        if (statusCode === "FINISHED") {
+          break;
+        }
 
-      return { success: true, postId: publishData.id };
+        if (statusCode === "ERROR") {
+          throw new Error("Instagram failed to process this video.");
+        }
+
+        if (i === maxStatusChecks - 1) {
+          throw new Error("Instagram is still processing this video. Please retry in a few moments.");
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      // Step 3: Publish Video (retry to handle eventual consistency)
+      const maxPublishAttempts = 3;
+      for (let attempt = 1; attempt <= maxPublishAttempts; attempt++) {
+        const publishResponse = await fetch(
+          `https://graph.facebook.com/v19.0/${finalId}/media_publish`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              creation_id: creationId,
+              access_token: finalToken
+            })
+          }
+        );
+
+        const publishData = await publishResponse.json();
+        if (!publishData.error) {
+          return { success: true, postId: publishData.id };
+        }
+
+        const message = String(publishData.error.message || "");
+        const canRetry = message.includes("Media ID is not available") || message.includes("not found");
+        if (!canRetry || attempt === maxPublishAttempts) {
+          throw new Error(publishData.error.message);
+        }
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+      }
+
+      throw new Error("Failed to publish video to Instagram.");
     } catch (error: any) {
       return { success: false, error: error.message };
     }

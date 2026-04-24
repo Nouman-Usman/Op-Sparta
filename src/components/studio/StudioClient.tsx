@@ -211,10 +211,6 @@ export default function StudioClient({
                                 <div className={cn("w-2 h-2 rounded-full", post.status === 'published' ? "bg-emerald-500" : "bg-amber-500 animate-pulse")} />
                                 <span className="text-[10px] font-bold text-white uppercase tracking-widest">{post.status}</span>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] font-black text-white/50">
-                                <ShieldCheck size={12} className="text-accent" />
-                                {post.supervisionScore}%
-                            </div>
                         </div>
                      </div>
                      
@@ -229,23 +225,10 @@ export default function StudioClient({
            )}
         </div>
 
-        {/* Supervision Sidebar (Selected Post Detail) */}
+          {/* Post Sidebar (Selected Post Detail) */}
         <div className="space-y-6">
           {selectedPost ? (
             <div className="glass-dark space-y-6 rounded-4xl border border-white/5 p-5 sm:space-y-8 sm:rounded-[2.5rem] sm:p-8 lg:sticky lg:top-8">
-                <div>
-                   <h3 className="text-[10px] font-black text-zinc-500 uppercase tracking-widest mb-4 flex items-center gap-2">
-                      <ShieldCheck size={14} className="text-accent" />
-                      AI Inspection Layer
-                   </h3>
-                   <div className="flex items-center gap-3">
-                     <div className="text-3xl font-black text-white sm:text-4xl">{selectedPost.supervisionScore}</div>
-                      <div className="text-[10px] text-zinc-500 uppercase tracking-tighter leading-none font-bold">
-                         AI Approval<br/>Score Verified
-                      </div>
-                   </div>
-                </div>
-
                 <div className="space-y-4">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Optimized Caption</label>
                     <div className="text-sm text-zinc-400 bg-white/5 border border-white/5 rounded-2xl p-4 italic font-medium leading-relaxed">
@@ -319,7 +302,7 @@ export default function StudioClient({
           ) : (
             <div className="glass-dark rounded-4xl border border-white/5 p-8 py-16 text-center sm:rounded-[2.5rem] sm:py-20">
                 <ShieldCheck size={32} className="text-zinc-800 mx-auto mb-4" />
-                <p className="text-xs text-zinc-600 italic">Select an asset to view supervision analysis.</p>
+                <p className="text-xs text-zinc-600 italic">Select an asset to view post details.</p>
             </div>
           )}
 

@@ -33,8 +33,12 @@ export async function approveAndPost(postId: string) {
         caption: post.caption || ""
       }, creds);
     } else {
+      if (!post.imageUrl) {
+        throw new Error("This post has no media URL yet. Wait for generation to complete and try again.");
+      }
+
       result = await InstagramService.publishPhoto({
-        imageUrl: post.imageUrl || "",
+        imageUrl: post.imageUrl,
         caption: post.caption || ""
       }, creds);
     }
