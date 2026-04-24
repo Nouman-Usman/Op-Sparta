@@ -6,7 +6,6 @@ import { useState } from "react";
 import { 
   LayoutDashboard, 
   Sparkles, 
-  Calendar, 
   BarChart3, 
   Settings, 
   PlusCircle,
@@ -20,9 +19,7 @@ import { createClient } from "@/utils/supabase/client";
 const navigation = [
   { name: "Dashboard", href: "/overview", icon: LayoutDashboard },
   { name: "Content Studio", href: "/studio", icon: Sparkles },
-  { name: "Calendar", href: "/calendar", icon: Calendar },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Test Publisher", href: "/test-post", icon: Zap }, // New shortcut
 ];
 
 const secondaryNavigation = [
@@ -45,12 +42,12 @@ export function Sidebar() {
   };
 
   return (
-    <div className="flex flex-col w-64 bg-card border-r border-border h-screen sticky top-0">
+    <div className="hidden h-screen w-64 sticky top-0 border-r border-border bg-card md:flex md:flex-col">
       <div className="p-6 flex items-center gap-3">
         <div className="w-10 h-10 rounded-xl bg-accent flex items-center justify-center shadow-[0_0_20px_rgba(var(--accent),0.3)]">
           <Zap className="text-accent-foreground fill-accent-foreground" size={24} />
         </div>
-        <span className="text-xl font-bold tracking-tight bg-gradient-to-br from-white to-zinc-500 bg-clip-text text-transparent">
+        <span className="text-xl font-bold tracking-tight bg-linear-to-br from-white to-zinc-500 bg-clip-text text-transparent">
           Sparta
         </span>
       </div>

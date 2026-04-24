@@ -8,11 +8,11 @@ import {
   Eye,
   EyeOff,
   Loader2,
-  Zap,
-  Sparkles,
   Trash2,
-  Power,
-  Instagram
+  Instagram,
+  CheckCircle2,
+  Link2,
+  Shield
 } from "lucide-react";
 import { saveAiKey } from "@/app/actions/save-ai-keys";
 import { deleteAiKey, toggleAiKey, updateAiModel } from "@/app/actions/manage-ai-keys";
@@ -56,6 +56,7 @@ export default function SettingsClient({
   const [aiFeedback, setAiFeedback] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const isInstagramConnected = !!integrationData?.instagramAccessToken;
+  const activeKeyCount = initialKeys?.filter((k) => k.isActive)?.length || 0;
 
   const handleSaveAiKey = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,186 +112,252 @@ export default function SettingsClient({
   );
 
   return (
-    <div className="space-y-16">
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
-        {/* Social Destination Section (Seamless Auth) */}
-        <div className={cn(
-          "glass-dark border rounded-[2.5rem] p-10 relative overflow-hidden transition-all duration-500",
+    <div className="space-y-6 sm:space-y-8">
+      <section className="glass-dark overflow-hidden rounded-4xl border border-white/5 p-5 sm:p-7">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-accent/20 bg-accent/10 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-accent">
+              <Shield size={12} />
+              Control Center
+            </div>
+            <h2 className="text-2xl font-extrabold tracking-tight text-white sm:text-3xl">Integrations and Provider Vault</h2>
+            <p className="max-w-2xl text-sm text-zinc-400 sm:text-base">
+              Manage your social connection and AI credentials from one panel. Keys are encrypted and can be activated or paused at any time.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 sm:w-auto">
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center">
+              <div className="text-xl font-black text-white">{activeKeyCount}</div>
+              <div className="text-[10px] uppercase tracking-widest text-zinc-500">Active Keys</div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center">
+              <div className={cn("text-xl font-black", isInstagramConnected ? "text-emerald-400" : "text-zinc-500")}>
+                {isInstagramConnected ? "Live" : "Off"}
+              </div>
+              <div className="text-[10px] uppercase tracking-widest text-zinc-500">Instagram</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
+        <section className={cn(
+          "glass-dark rounded-4xl border p-5 sm:p-6 xl:col-span-1",
           isInstagramConnected ? "border-emerald-500/20" : "border-white/5"
         )}>
-          <div className="absolute top-0 right-0 p-8 opacity-5">
-             <Instagram size={140} className="text-pink-500" />
-          </div>
-
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-pink-500/10 flex items-center justify-center border border-pink-500/20">
-                <Instagram className="text-pink-400" size={24} />
+          <div className="mb-5 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-pink-500/20 bg-pink-500/10">
+                <Instagram className="text-pink-400" size={20} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-white">Social Destination</h2>
-                <p className="text-sm text-zinc-500">Instagram Graph API</p>
+                <h3 className="text-base font-bold text-white">Instagram</h3>
+                <p className="text-xs text-zinc-500">Publishing destination</p>
               </div>
             </div>
 
-            {isInstagramConnected && (
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 text-[10px] font-black uppercase tracking-widest">
-                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Connected
-              </div>
-            )}
+            <div className={cn(
+              "rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-widest",
+              isInstagramConnected
+                ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                : "border-white/10 bg-white/5 text-zinc-500"
+            )}>
+              {isInstagramConnected ? "Connected" : "Not Connected"}
+            </div>
           </div>
-          
-          <div className="space-y-8 relative z-10">
-            <div className="p-8 rounded-3xl bg-white/5 border border-white/5 space-y-6">
 
-              {isInstagramConnected ? (
-                <>
-                  {/* Connected Account Details */}
-                  <div className="space-y-4">
-                    <h3 className="text-sm font-bold text-white">Connected Page</h3>
-
-                    <div className="flex items-center gap-4 px-5 py-4 rounded-xl bg-black/40 border border-white/5">
-                      {integrationData.instagramProfilePic ? (
-                        <img 
-                          src={integrationData.instagramProfilePic} 
-                          alt="Instagram Profile" 
-                          className="w-12 h-12 rounded-full border border-white/10"
-                        />
-                      ) : (
-                        <div className="w-12 h-12 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                          <Instagram size={20} className="text-zinc-500" />
-                        </div>
-                      )}
-                      <div>
-                        <div className="text-sm font-bold text-white">
-                          {integrationData.instagramUsername ? `@${integrationData.instagramUsername}` : "Instagram Page"}
-                        </div>
-                        <div className="text-[10px] uppercase tracking-widest text-emerald-400 font-bold mt-1">
-                          Connected
-                        </div>
-                      </div>
+          {isInstagramConnected ? (
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-white/10 bg-black/30 p-4">
+                <div className="flex items-center gap-3">
+                  {integrationData.instagramProfilePic ? (
+                    <img
+                      src={integrationData.instagramProfilePic}
+                      alt="Instagram Profile"
+                      className="h-12 w-12 rounded-full border border-white/10"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-white/5">
+                      <Instagram size={18} className="text-zinc-500" />
+                    </div>
+                  )}
+                  <div>
+                    <div className="text-sm font-bold text-white">
+                      {integrationData.instagramUsername ? `@${integrationData.instagramUsername}` : "Instagram Page"}
+                    </div>
+                    <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-widest text-emerald-400">
+                      <CheckCircle2 size={12} />
+                      Authenticated
                     </div>
                   </div>
-
-                  {/* Action Buttons */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <a
-                      href="/api/auth/instagram"
-                      className="py-3 rounded-2xl font-bold flex items-center justify-center gap-2 transition-all active:scale-[0.98] bg-white/5 border border-white/10 text-white hover:bg-white/10 text-sm"
-                    >
-                      <Instagram size={16} />
-                      Reconnect
-                    </a>
-                    <DisconnectButton />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <h3 className="text-sm font-bold text-white">Managed Integration</h3>
-                    <p className="text-xs text-zinc-500 leading-relaxed max-w-xs">
-                      Click below to link your Instagram Business account via our secure managed gateway.
-                    </p>
-                  </div>
-                  <a
-                    href="/api/auth/instagram"
-                    className="w-full py-4 rounded-2xl font-bold flex items-center justify-center gap-3 transition-all active:scale-[0.98] shadow-xl bg-gradient-to-r from-pink-600 to-rose-600 text-white hover:opacity-90 shadow-pink-600/20"
-                  >
-                    <Instagram size={20} />
-                    Authenticate Instagram
-                  </a>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Global Key Entry Section - Existing */}
-        <div className="lg:col-span-2">
-          <div className="glass-dark border border-white/5 rounded-[2.5rem] p-10 relative overflow-hidden">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <Key size={24} className="text-accent" />
-              Provider Credentials
-            </h2>
-            <p className="text-zinc-400 text-sm mb-8">Manage the master API keys used for AI Supervision and deep reasoning.</p>
-            
-            <div className="grid grid-cols-3 gap-4 mb-8">
-                {PROVIDERS.map((p) => (
-                  <button key={p.id} onClick={() => setSelectedProvider(p.id as any)} className={cn("p-4 rounded-xl border text-center transition-all", selectedProvider === p.id ? "bg-accent/10 border-accent text-accent" : "bg-white/5 border-white/5 text-zinc-500 hover:border-white/10")}>
-                    <span className="text-[10px] font-bold uppercase">{p.name}</span>
-                  </button>
-                ))}
-            </div>
-            
-            <form onSubmit={handleSaveAiKey} className="space-y-6">
-              <div className="relative group">
-                <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-accent" size={20} />
-                <input type={showKey ? "text" : "password"} value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="Enter API Key" className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-12 pr-12 text-white focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all font-mono" required />
-                <button type="button" onClick={() => setShowKey(!showKey)} className="absolute right-4 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">{showKey ? <EyeOff size={20} /> : <Eye size={20} />}</button>
+                </div>
               </div>
-              {aiFeedback && <div className={cn("p-4 rounded-2xl text-sm font-medium border", aiFeedback.type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-500" : "bg-red-500/10 border-red-500/20 text-red-500")}>{aiFeedback.message}</div>}
-              <button type="submit" disabled={isPending || !apiKey} className="w-full bg-white text-black py-4 rounded-2xl font-bold hover:bg-zinc-200 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
-                {isPending ? <Loader2 className="animate-spin" /> : <><span>Activate Global Key</span><ArrowRight size={18} /></>}
-              </button>
-            </form>
 
-            {/* Render Saved Keys */}
-            {initialKeys && initialKeys.length > 0 && (
-              <div className="mt-12 pt-12 border-t border-white/5 space-y-6">
-                <h3 className="text-white font-bold mb-4 flex items-center gap-2">
-                  <Lock size={18} className="text-accent" />
-                  Active Connections
-                </h3>
-                <div className="space-y-4">
-                  {initialKeys.map((key) => {
-                    const providerDef = PROVIDERS.find(p => p.id === key.provider);
-                    return (
-                      <div key={key.id} className="p-6 rounded-2xl bg-white/5 border border-white/5 transition-all hover:bg-white/10 group">
-                        <div className="flex items-center justify-between mb-4">
-                          <div className="flex items-center gap-3">
-                            <div className={cn("w-2 h-2 rounded-full", key.isActive ? "bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] animate-pulse" : "bg-zinc-600")} />
-                            <h4 className="text-white font-bold text-sm tracking-wide">{providerDef?.name || key.provider}</h4>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <button 
-                              onClick={() => handleToggle(key.id, !key.isActive)}
-                              className="text-xs px-3 py-1.5 rounded-full bg-black/40 text-zinc-400 font-bold hover:text-white border border-white/5 transition-colors"
-                            >
-                              {key.isActive ? "Pause" : "Activate"}
-                            </button>
-                            <button 
-                              onClick={() => handleDelete(key.id)}
-                              className="p-1.5 rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all opacity-0 group-hover:opacity-100"
-                              title="Revoke Key"
-                            >
-                              <Trash2 size={14} />
-                            </button>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                <a
+                  href="/api/auth/instagram"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-white transition-all hover:bg-white/10"
+                >
+                  <Link2 size={16} />
+                  Reconnect
+                </a>
+                <DisconnectButton />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm leading-relaxed text-zinc-500">
+                Link your Instagram Business account to enable one-click publish from studio.
+              </p>
+              <a
+                href="/api/auth/instagram"
+                className="inline-flex w-full items-center justify-center gap-3 rounded-2xl bg-linear-to-r from-pink-600 to-rose-600 px-4 py-3.5 text-sm font-bold text-white shadow-lg shadow-pink-600/20 transition-all hover:opacity-90"
+              >
+                <Instagram size={18} />
+                Authenticate Instagram
+              </a>
+            </div>
+          )}
+        </section>
+
+        <section className="glass-dark rounded-4xl border border-white/5 p-5 sm:p-6 xl:col-span-2">
+          <div className="mb-6 flex flex-col gap-2">
+            <h3 className="flex items-center gap-2 text-xl font-bold text-white">
+              <Key size={20} className="text-accent" />
+              Provider Credentials
+            </h3>
+            <p className="text-sm text-zinc-500">Select a provider, save a key, then activate and choose default models below.</p>
+          </div>
+
+          <div className="mb-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            {PROVIDERS.map((provider) => (
+              <button
+                key={provider.id}
+                onClick={() => setSelectedProvider(provider.id as any)}
+                className={cn(
+                  "rounded-xl border px-3 py-3 text-left transition-all",
+                  selectedProvider === provider.id
+                    ? "border-accent bg-accent/10"
+                    : "border-white/10 bg-white/5 hover:border-white/20"
+                )}
+              >
+                <div className={cn("text-xs font-black uppercase tracking-widest", selectedProvider === provider.id ? "text-accent" : "text-zinc-300")}>
+                  {provider.name}
+                </div>
+                <div className="mt-1 line-clamp-2 text-[11px] leading-relaxed text-zinc-500">{provider.description}</div>
+              </button>
+            ))}
+          </div>
+
+          <form onSubmit={handleSaveAiKey} className="space-y-4 rounded-2xl border border-white/10 bg-black/20 p-4">
+            <div className="relative group">
+              <Key className="absolute left-4 top-1/2 -translate-y-1/2 text-zinc-500 group-focus-within:text-accent" size={18} />
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="Paste API key"
+                className="w-full rounded-xl border border-white/10 bg-white/5 py-3 pl-11 pr-11 font-mono text-sm text-white transition-all focus:outline-none focus:ring-2 focus:ring-accent/50"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white"
+              >
+                {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+
+            {aiFeedback && (
+              <div className={cn(
+                "rounded-xl border p-3 text-sm font-medium",
+                aiFeedback.type === "success"
+                  ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+                  : "border-red-500/20 bg-red-500/10 text-red-400"
+              )}>
+                {aiFeedback.message}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isPending || !apiKey}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-black transition-all hover:bg-zinc-200 disabled:opacity-50"
+            >
+              {isPending ? <Loader2 className="animate-spin" size={16} /> : <><span>Save Provider Key</span><ArrowRight size={16} /></>}
+            </button>
+          </form>
+
+          <div className="mt-8 border-t border-white/10 pt-6">
+            <h4 className="mb-4 flex items-center gap-2 text-sm font-bold uppercase tracking-widest text-zinc-400">
+              <Lock size={14} />
+              Active Connections
+            </h4>
+
+            {initialKeys?.length ? (
+              <div className="space-y-3">
+                {initialKeys.map((key) => {
+                  const providerDef = PROVIDERS.find((p) => p.id === key.provider);
+
+                  return (
+                    <div key={key.id} className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className={cn("h-2 w-2 rounded-full", key.isActive ? "bg-emerald-500" : "bg-zinc-600")} />
+                          <div>
+                            <p className="text-sm font-bold text-white">{providerDef?.name || key.provider}</p>
+                            <p className="text-[11px] text-zinc-500">{key.isActive ? "Active" : "Paused"}</p>
                           </div>
                         </div>
-                        
-                        {key.config?.enabledModels && key.config.enabledModels.length > 0 && (
-                          <div className="space-y-2 mt-4 pt-4 border-t border-white/5">
-                            <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest pl-1">Default Model</label>
-                            <select 
-                              className="w-full bg-black/40 border border-white/5 rounded-xl py-3 px-4 text-xs text-white focus:outline-none focus:border-accent/50 appearance-none transition-all cursor-pointer hover:bg-black/60"
-                              value={key.config.defaultModel}
-                              onChange={(e) => handleModelChange(key.id, e.target.value)}
-                            >
-                              {key.config.enabledModels.map((model: string) => (
-                                <option key={model} value={model} className="bg-zinc-900 text-white">{model}</option>
-                              ))}
-                            </select>
-                          </div>
-                        )}
+
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => handleToggle(key.id, !key.isActive)}
+                            className="rounded-lg border border-white/10 bg-black/30 px-3 py-1.5 text-xs font-bold text-zinc-300 transition-colors hover:text-white"
+                          >
+                            {key.isActive ? "Pause" : "Activate"}
+                          </button>
+                          <button
+                            onClick={() => handleDelete(key.id)}
+                            className="rounded-lg border border-red-500/20 bg-red-500/10 p-1.5 text-red-400 transition-all hover:bg-red-500/20"
+                            title="Revoke Key"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {key.config?.enabledModels && key.config.enabledModels.length > 0 && (
+                        <div className="mt-4 border-t border-white/10 pt-4">
+                          <label className="mb-2 block pl-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
+                            Default Model
+                          </label>
+                          <select
+                            className="w-full cursor-pointer appearance-none rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-xs text-white transition-all hover:bg-black/60 focus:outline-none focus:border-accent/50"
+                            value={key.config.defaultModel}
+                            onChange={(e) => handleModelChange(key.id, e.target.value)}
+                          >
+                            {key.config.enabledModels.map((model: string) => (
+                              <option key={model} value={model} className="bg-zinc-900 text-white">
+                                {model}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-dashed border-white/10 bg-black/20 p-6 text-center">
+                <p className="text-sm text-zinc-500">No provider keys saved yet.</p>
               </div>
             )}
           </div>
-        </div>
+        </section>
       </div>
     </div>
   );

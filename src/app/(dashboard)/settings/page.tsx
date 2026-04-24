@@ -13,21 +13,36 @@ export default async function SettingsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return redirect("/login");
 
-  // Fetch all keys and user integration data
-  const userKeys = await db
-    .select()
-    .from(aiKeys)
-    .where(eq(aiKeys.userId, user.id));
+  let userKeys: any[] = [];
+  let rawIntegrationData: {
+    n8nGenerationWebhook?: string | null;
+    instagramAccessToken?: string | null;
+    instagramPageId?: string | null;
+  } | undefined;
 
-  const [rawIntegrationData] = await db
-    .select({ 
-      n8nGenerationWebhook: users.n8nGenerationWebhook,
-      instagramAccessToken: users.instagramAccessToken, 
-      instagramPageId: users.instagramPageId 
-    })
-    .from(users)
-    .where(eq(users.id, user.id))
-    .limit(1);
+  // Keep settings page available even if DB schema or connection is temporarily unhealthy.
+  try {
+    const [keysResult, integrationResult] = await Promise.all([
+      db
+        .select()
+        .from(aiKeys)
+        .where(eq(aiKeys.userId, user.id)),
+      db
+        .select({
+          n8nGenerationWebhook: users.n8nGenerationWebhook,
+          instagramAccessToken: users.instagramAccessToken,
+          instagramPageId: users.instagramPageId,
+        })
+        .from(users)
+        .where(eq(users.id, user.id))
+        .limit(1),
+    ]);
+
+    userKeys = keysResult;
+    rawIntegrationData = integrationResult[0];
+  } catch (error) {
+    console.error("SettingsPage: failed to load DB settings data", error);
+  }
 
   let integrationData = Object.assign({}, rawIntegrationData);
 
@@ -51,19 +66,19 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-5xl mx-auto w-full space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-5 animate-in fade-in slide-in-from-bottom-4 duration-700 sm:space-y-8 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-2">
+      <div className="rounded-4xl border border-white/5 bg-linear-to-br from-white/4 to-white/1 p-5 sm:p-7">
+        <div className="mb-2 flex items-center gap-2">
           <Shield className="text-accent" size={16} />
-          <span className="text-[10px] uppercase tracking-[0.2em] font-bold text-zinc-500">Security & Integration</span>
+          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Security and Integration</span>
         </div>
-        <h1 className="text-4xl font-extrabold text-white tracking-tight">
-          System Configuration
+        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
+          Settings
         </h1>
-        <p className="text-zinc-400 mt-2 max-w-2xl">
-          Configure your AI generation engine and social publishing destinations.
-          We follow a <span className="text-white font-medium">Bring Your Own Key</span> and <span className="text-white font-medium">Engine</span> model for maximum privacy.
+        <p className="mt-2 max-w-3xl text-sm text-zinc-400 sm:text-base">
+          Configure social destinations and AI providers for your workspace.
+          Operation Sparta follows a <span className="font-medium text-white">Bring Your Own Key</span> model to keep full control in your hands.
         </p>
       </div>
 

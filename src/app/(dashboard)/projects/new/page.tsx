@@ -104,7 +104,7 @@ export default function NewProjectPage() {
   };
 
   return (
-    <div className="p-8 max-w-4xl mx-auto w-full">
+    <div className="mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
       <Link 
         href="/overview"
         className="flex items-center gap-2 text-zinc-500 hover:text-white transition-colors mb-8 group w-fit"
@@ -113,16 +113,16 @@ export default function NewProjectPage() {
         Back to Dashboard
       </Link>
 
-      <div className="mb-12">
-        <h1 className="text-5xl font-extrabold tracking-tight text-white mb-4 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent">
+      <div className="mb-8 sm:mb-12">
+        <h1 className="mb-3 bg-linear-to-r from-white to-zinc-500 bg-clip-text text-3xl font-extrabold tracking-tight text-transparent sm:mb-4 sm:text-5xl">
           New Brand Engine
         </h1>
-        <p className="text-zinc-400 text-lg">Define your brand identity to power our AI supervision layer.</p>
+        <p className="text-base text-zinc-400 sm:text-lg">Define your brand identity to power our AI supervision layer.</p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:gap-10">
         <div className="lg:col-span-2">
-          <form onSubmit={handleSubmit} className="space-y-8 glass-dark p-8 rounded-[2.5rem] border border-white/5 relative overflow-hidden">
+          <form onSubmit={handleSubmit} className="glass-dark relative space-y-6 overflow-hidden rounded-4xl border border-white/5 p-5 sm:space-y-8 sm:rounded-[2.5rem] sm:p-8">
             <div className="space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Name</label>
@@ -136,7 +136,7 @@ export default function NewProjectPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                     <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Color</label>
                     <div className="flex bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-accent transition-all">
@@ -214,7 +214,7 @@ export default function NewProjectPage() {
                 </div>
 
                 {imageInputMode === "upload" ? (
-                  <div className="relative border-2 border-dashed border-white/10 rounded-[2rem] p-8 text-center hover:bg-white/5 hover:border-white/20 transition-all group overflow-hidden">
+                  <div className="group relative overflow-hidden rounded-3xl border-2 border-dashed border-white/10 p-6 text-center transition-all hover:border-white/20 hover:bg-white/5 sm:rounded-4xl sm:p-8">
                     
                     {isPending ? (
                       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-10">
@@ -268,7 +268,7 @@ export default function NewProjectPage() {
             <button 
               type="submit" 
               disabled={isPending || !formData.name}
-              className="w-full bg-white text-black py-5 rounded-2xl font-black text-sm uppercase tracking-widest hover:scale-[1.02] transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+              className="flex w-full items-center justify-center gap-2 rounded-2xl bg-white py-4 text-sm font-black uppercase tracking-widest text-black transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 sm:py-5"
             >
               {isPending ? <Loader2 className="animate-spin" /> : <>Initialize Project <ArrowRight size={18} /></>}
             </button>
@@ -276,7 +276,7 @@ export default function NewProjectPage() {
         </div>
 
         <div className="space-y-6">
-          <div className="glass-dark border border-white/5 p-8 rounded-[2.5rem]">
+          <div className="glass-dark rounded-4xl border border-white/5 p-6 sm:rounded-[2.5rem] sm:p-8">
             <h3 className="text-white font-bold mb-4 flex items-center gap-2">
               <Sparkles size={18} className="text-accent" />
               SaaS Engine Pro
@@ -298,7 +298,7 @@ export default function NewProjectPage() {
             </div>
           </div>
 
-          <div className="p-8 rounded-[2.5rem] bg-indigo-600/10 border border-indigo-600/20">
+          <div className="rounded-4xl border border-indigo-600/20 bg-indigo-600/10 p-6 sm:rounded-[2.5rem] sm:p-8">
              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center mb-4 text-white">
                 <Zap size={20} fill="currentColor" />
              </div>
