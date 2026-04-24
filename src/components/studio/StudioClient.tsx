@@ -13,6 +13,7 @@ import {
   Trash2,
   ExternalLink,
   ChevronRight,
+  ChevronLeft,
   ShieldCheck,
   Send,
   Play,
@@ -68,6 +69,8 @@ export default function StudioClient({
   const [selectedPost, setSelectedPost] = useState<any>(initialPosts[0] || null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedCaption, setEditedCaption] = useState("");
+  const [isRefining, setIsRefining] = useState(false);
+  const [refinementPrompt, setRefinementPrompt] = useState("");
   const [confirmConfig, setConfirmConfig] = useState<{
     open: boolean;
     title: string;
@@ -75,6 +78,41 @@ export default function StudioClient({
     onConfirm: () => void;
   }>({ open: false, title: "", description: "", onConfirm: () => {} });
   const router = useRouter();
+
+  const handleRegenerate = async (postId: string) => {
+    setIsRefining(true);
+  };
+
+  const handleConfirmRegenerate = async () => {
+    if (!selectedPost) return;
+    setIsRefining(false);
+    const prompt = refinementPrompt;
+    setRefinementPrompt(""); 
+    
+    startTransition(async () => {
+      const result = await regeneratePost(selectedPost.id, project.id, prompt);
+      if (result.success) {
+        toast.success("New variant initiated.");
+        // The result now returns newPostId, but since initialPosts won't have it 
+        // until the next poll/refresh, we'll let the polling handle the auto-focus
+        // if we want, OR we can optimismically set it if we had the full object.
+        // For now, let's just let the gallery update.
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  const navigatePost = (direction: 'prev' | 'next') => {
+    const currentIndex = initialPosts.findIndex(p => p.id === selectedPost?.id);
+    if (currentIndex === -1) return;
+    
+    let nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+    if (nextIndex < 0) nextIndex = initialPosts.length - 1;
+    if (nextIndex >= initialPosts.length) nextIndex = 0;
+    
+    setSelectedPost(initialPosts[nextIndex]);
+  };
 
   const openConfirm = (title: string, description: string, onConfirm: () => void) => {
     setConfirmConfig({ open: true, title, description, onConfirm });
@@ -149,24 +187,6 @@ export default function StudioClient({
     );
   };
 
-  const handleRegenerate = async (postId: string) => {
-    openConfirm(
-      "Regenerate Asset",
-      "The current version will be deleted and a new one will be synthesized. Ready to proceed?",
-      async () => {
-        startTransition(async () => {
-          const result = await regeneratePost(postId, project.id);
-          if (result.success) {
-            if (selectedPost?.id === postId) setSelectedPost(null);
-            toast.success("Regeneration engine started.");
-          } else {
-            toast.error(result.error);
-          }
-        });
-      }
-    );
-  };
-
   const handleTriggerClick = () => {
     if (activeProviders.length > 1) setShowProviderSelect(true);
     else executeTrigger(activeProviders[0] || 'auto');
@@ -230,7 +250,7 @@ export default function StudioClient({
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
             {isPending ? <Loader2 className="animate-spin" /> : (
               <span className="relative z-10 flex items-center gap-3">
-                <Zap size={18} fill="currentColor" /> Trigger Engine
+                <Zap size={18} fill="currentColor" /> Generate Assets
               </span>
             )}
           </button>
@@ -297,13 +317,21 @@ export default function StudioClient({
                               <Play size={14} fill="white" className="text-white ml-0.5" />
                             </div>
                           </div>
-                        ) : (
+                        ) : post.imageUrl ? (
                           <Image 
-                            src={post.imageUrl || ""} 
+                            src={post.imageUrl} 
                             alt="Post preview" 
                             fill 
                             className="object-cover group-hover:scale-110 transition-transform duration-1000"
                           />
+                        ) : (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-card">
+                            <div className="h-12 w-12 rounded-2xl bg-zinc-800 flex items-center justify-center mb-6">
+                              <Sparkles size={24} className="text-zinc-600" />
+                            </div>
+                            <div className="text-sm font-display font-bold text-zinc-500 mb-1.5 uppercase tracking-tighter italic">No Asset Data</div>
+                            <div className="text-[10px] text-zinc-700 uppercase tracking-widest font-black">Waiting for Synthesis</div>
+                          </div>
                         )}
                         
                         {/* Minimal Status Overlay */}
@@ -383,6 +411,73 @@ export default function StudioClient({
             {selectedPost ? (
               <div className="lg:sticky lg:top-48 space-y-8">
                 <div className="bg-card rounded-[2.5rem] p-8 lg:p-10 space-y-10">
+                  {/* Asset Swipe Preview */}
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[2.5rem] bg-muted group">
+                    {selectedPost.status === 'generating' ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center bg-zinc-900/50 backdrop-blur-sm">
+                        <div className="h-16 w-16 rounded-3xl bg-accent/10 flex items-center justify-center mb-8">
+                          <Loader2 size={32} className="text-accent animate-spin" />
+                        </div>
+                        <h3 className="text-2xl font-display font-bold text-white mb-2 uppercase tracking-tighter italic">Neural Synthesis</h3>
+                        <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Refining Signal Parameters</p>
+                      </div>
+                    ) : selectedPost.videoUrl ? (
+                      <video 
+                        key={selectedPost.videoUrl}
+                        src={selectedPost.videoUrl} 
+                        autoPlay 
+                        muted 
+                        loop 
+                        playsInline
+                        className="h-full w-full object-cover transition-all duration-700" 
+                      />
+                    ) : selectedPost.imageUrl ? (
+                      <Image 
+                        key={selectedPost.imageUrl}
+                        src={selectedPost.imageUrl} 
+                        alt="Preview" 
+                        fill 
+                        className="object-cover transition-all duration-700" 
+                      />
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
+                         <Sparkles size={48} className="text-zinc-800 mb-6" />
+                         <p className="text-sm text-zinc-500 font-medium">Awaiting primary asset data...</p>
+                      </div>
+                    )}
+
+                    {/* Desktop Navigation Chevrons */}
+                    <div className="absolute inset-y-0 left-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); navigatePost('prev'); }}
+                        className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-accent-foreground transition-all"
+                      >
+                        <ChevronLeft size={18} />
+                      </button>
+                    </div>
+                    <div className="absolute inset-y-0 right-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); navigatePost('next'); }}
+                        className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-accent-foreground transition-all"
+                      >
+                        <ChevronRight size={18} />
+                      </button>
+                    </div>
+
+                    {/* Pagination Indicators */}
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/5">
+                      {initialPosts.map((p, i) => (
+                        <div 
+                          key={p.id}
+                          className={cn(
+                            "h-1 rounded-full transition-all duration-500",
+                            p.id === selectedPost.id ? "w-4 bg-accent" : "w-1 bg-white/20"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </div>
+
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Master Caption</label>
@@ -578,6 +673,33 @@ export default function StudioClient({
           </div>
         </div>
       )}
+
+      {/* Refinement Dialog */}
+      <AlertDialog open={isRefining} onOpenChange={setIsRefining}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Refine Signal</AlertDialogTitle>
+            <AlertDialogDescription>
+              What changes do you want to see in this asset? Your refinement prompt will be sent to the synthesis engine.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="py-4">
+            <textarea
+              value={refinementPrompt}
+              onChange={(e) => setRefinementPrompt(e.target.value)}
+              className="w-full bg-muted/50 border border-white/5 rounded-2xl p-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent/50 min-h-[120px] resize-none"
+              placeholder="e.g. Make it more vibrant, add a neon glow, or change the background to a futuristic city..."
+              autoFocus
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setRefinementPrompt("")}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmRegenerate}>
+              Trigger Regeneration
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Confirmation Dialog */}
       <AlertDialog 

@@ -185,11 +185,19 @@ export async function regeneratePost(postId: string, projectId: string, refineme
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    // 1. Fetch current post data context
-    const [currentPost] = await db.select().from(posts).where(eq(posts.id, postId));
-    if (!currentPost) throw new Error("Post not found");
+    // 1. Create a NEW variant post record
+    const [newPost] = await db.insert(posts).values({
+      projectId,
+      userId: user.id,
+      status: 'generating',
+      caption: `Regenerating...` // Placeholder until n8n returns
+    }).returning();
 
-    // 2. Trigger specialized Regeneration Webhook
+    // 2. Fetch context from the "parent" post
+    const [parentPost] = await db.select().from(posts).where(eq(posts.id, postId));
+    const [projectData] = await db.select().from(projects).where(eq(projects.id, projectId));
+
+    // 3. Trigger specialized Regeneration Webhook with NEW postId
     const webhookUrl = process.env.n8n_Regenerate_Webhook;
     if (webhookUrl) {
       await fetch(webhookUrl, {
@@ -197,26 +205,20 @@ export async function regeneratePost(postId: string, projectId: string, refineme
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           projectId,
-          postId,
+          projectName: projectData?.name || "Unknown Project",
+          projectDescription: projectData?.productDesc || "",
+          postId: newPost.id, // THE NEW ID
+          parentPostId: postId,
           refinementPrompt: refinementPrompt || "Default Regeneration",
-          currentImageUrl: currentPost.imageUrl,
-          currentVideoUrl: currentPost.videoUrl,
-          currentCaption: currentPost.caption
+          currentImageUrl: parentPost?.imageUrl,
+          currentVideoUrl: parentPost?.videoUrl,
+          currentCaption: parentPost?.caption
         })
       });
     }
 
-    // 3. Reset status to 'generating'
-    await db.update(posts)
-      .set({ 
-        status: 'generating', 
-        imageUrl: null, 
-        videoUrl: null 
-      })
-      .where(and(eq(posts.id, postId), eq(posts.userId, user.id)));
-
     revalidatePath("/studio");
-    return { success: true };
+    return { success: true, newPostId: newPost.id };
   } catch (error: any) {
     return { success: false, error: error.message };
   }

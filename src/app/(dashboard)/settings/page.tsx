@@ -18,6 +18,8 @@ export default async function SettingsPage() {
     n8nGenerationWebhook?: string | null;
     instagramAccessToken?: string | null;
     instagramPageId?: string | null;
+    instagramUsername?: string | null;
+    instagramProfilePic?: string | null;
   } | undefined;
 
   // Keep settings page available even if DB schema or connection is temporarily unhealthy.

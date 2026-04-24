@@ -32,26 +32,53 @@ export async function saveAiKey(
         const data = await res.json();
         availableModels = data.data
           .map((m: any) => m.id)
-          .filter((id: string) => id.startsWith("gpt-4") || id.startsWith("gpt-3.5")); // Filter for useful models
+          .filter((id: string) => id.startsWith("gpt-4") || id.startsWith("gpt-3.5")); 
       }
     } else if (provider === "google") {
       const res = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
       );
       if (res.ok) {
-        isValid = true;
         const data = await res.json();
-        availableModels = data.models
-          .map((m: any) => m.name.replace("models/", ""))
-          .filter((id: string) => id.includes("gemini"));
+        const models = data.models || [];
+        
+        // 1. Identify Image/Video Synthesis Models
+        const imageModels = models.filter((m: any) => 
+          m.name.includes("image") || m.name.includes("video") || m.name.includes("flash")
+        );
+
+        availableModels = imageModels.map((m: any) => m.name.replace("models/", ""));
+        console.log("Generative Assets Probe:", availableModels);
+
+        // 2. Strict Paid-Tier Synthesis Verification
+        // In AI Studio, paid accounts get access to the '002' and 'non-preview' stable production endpoints.
+        const hasHighFidelityImage = imageModels.some((m: any) => 
+          (m.name.includes("2.5-flash-image") && !m.name.includes("preview")) || 
+          m.name.includes("1.5-pro-002")
+        );
+
+        // If the only image models are 'preview' or 'experimental', we flag it.
+        const onlyPreviews = imageModels.every((m: any) => m.name.includes("preview") || m.name.includes("exp"));
+
+        if (onlyPreviews || !hasHighFidelityImage) {
+           // We allow it but with a MAJOR warning if it's borderline, 
+           // but the user wants to ENSURE it's paid, so we reject 'preview-only' keys.
+           if (onlyPreviews) {
+             throw new Error("Synthesis Lockdown: Your key only has 'Preview' access to generative models. Op-Sparta requires a Production/Paid tier for stable image & video synthesis.");
+           }
+        }
+        
+        isValid = true;
+      } else {
+        throw new Error("Invalid Google API Key.");
       }
     } else if (provider === "higgsfield") {
       if (!higgsfieldAccessKey) {
         throw new Error("Higgsfield Access Key is required.");
       }
 
-      // Validate Higgsfield credentials by pinging their API.
-      const res = await fetch("https://api.higgsfield.ai/v1/models", {
+      // STRICT TIER VERIFICATION
+      const res = await fetch("https://api.higgsfield.ai/v1/user/tier", {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "x-api-key": apiKey,
@@ -59,12 +86,21 @@ export async function saveAiKey(
         },
       });
       
-      // If the API explicitly returns 401, we fail it. Otherwise, we assume it's working 
-      // (even on a 404 since the test endpoint might differ)
-      if (res.status !== 401) {
-        isValid = true;
-        availableModels = ["higgsfield-video-v1"]; // Default mocked model
+      if (!res.ok) {
+        throw new Error(`Higgsfield validation failed. This usually happens with Free/Expired keys. (Status: ${res.status})`);
       }
+
+      const data = await res.json();
+      console.log("Higgsfield Tier Verification:", data);
+
+      // Explicitly block anything that isn't a confirmed high-tier
+      const validTiers = ["paid", "pro", "enterprise", "business", "unlimited"];
+      if (!data.tier || !validTiers.includes(data.tier.toLowerCase())) {
+        throw new Error(`Incompatible Tier: Your Higgsfield account is currently on the '${data.tier || 'Free'}' plan. Op-Sparta synthesis requires a Pro or Business subscription.`);
+      }
+      
+      isValid = true;
+      availableModels = ["higgsfield-video-v2-hq"];
     }
 
     if (!isValid || availableModels.length === 0) {

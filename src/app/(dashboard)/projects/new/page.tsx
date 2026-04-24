@@ -125,7 +125,7 @@ export default function NewProjectPage() {
           <form onSubmit={handleSubmit} className="glass-dark relative space-y-6 overflow-hidden rounded-4xl border border-white/5 p-5 sm:space-y-8 sm:rounded-[2.5rem] sm:p-8">
             <div className="space-y-6">
               <div className="space-y-2">
-                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Name</label>
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Product Name</label>
                 <input 
                   type="text" 
                   placeholder="e.g. Tesla Cybergear"
@@ -138,7 +138,7 @@ export default function NewProjectPage() {
 
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Brand Color</label>
+                    <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Product Color</label>
                     <div className="flex bg-white/5 border border-white/10 rounded-2xl overflow-hidden focus-within:ring-2 focus-within:ring-accent transition-all">
                       <input 
                         type="color" 
