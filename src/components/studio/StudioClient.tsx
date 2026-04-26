@@ -188,6 +188,19 @@ export default function StudioClient({
   };
 
   const handleTriggerClick = () => {
+    // Check if Higgsfield is present but no text-based AI provider
+    const hasHiggsfield = activeProviders.includes('higgsfield');
+    const hasTextProvider = activeProviders.some(p => p === 'google' || p === 'openai');
+
+    if (hasHiggsfield && !hasTextProvider) {
+      openConfirm(
+        "Add AI Provider",
+        "Higgsfield is configured for images, but you need an AI provider (Gemini or OpenAI) for content generation. Go to Settings to add one?",
+        () => { window.location.href = "/settings"; }
+      );
+      return;
+    }
+
     if (activeProviders.length > 1) setShowProviderSelect(true);
     else executeTrigger(activeProviders[0] || 'auto');
   };
