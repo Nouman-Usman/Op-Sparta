@@ -72,7 +72,7 @@ export default async function OverviewPage() {
           href="/projects/new"
           className="w-full rounded-2xl border border-white/10 bg-accent px-6 py-3.5 font-bold text-accent-foreground shadow-xl shadow-accent/20 transition-all hover:scale-[1.02] sm:w-auto sm:py-4"
         >
-          <Plus size={20} />
+          {/* <Plus size={20} /> */}
           Launch New Project
         </Link>
       </div>
