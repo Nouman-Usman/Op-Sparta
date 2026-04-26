@@ -2,7 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
-import { projects } from "@/db/schema";
+import { projects, prompts } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq, and } from "drizzle-orm";
 import { aiKeys, posts } from "@/db/schema";
@@ -178,7 +178,7 @@ export async function deletePost(postId: string) {
   }
 }
 
-export async function regeneratePost(postId: string, projectId: string, refinementPrompt?: string) {
+export async function regeneratePost(postId: string, projectId: string, refinementPrompt?: string, selectedProvider?: string) {
   try {
     const supabase = await createClient();
     if (!supabase) throw new Error("Unauthorized");
@@ -197,7 +197,40 @@ export async function regeneratePost(postId: string, projectId: string, refineme
     const [parentPost] = await db.select().from(posts).where(eq(posts.id, postId));
     const [projectData] = await db.select().from(projects).where(eq(projects.id, projectId));
 
-    // 3. Trigger specialized Regeneration Webhook with NEW postId
+    // 3. Fetch original image_prompt from prompts table
+    const parentPrompts = await db.select().from(prompts).where(eq(prompts.postId, postId));
+    const originalImagePrompt = parentPrompts[0]?.prompt || "";
+
+    // 4. Fetch AI Keys (all active keys for this user)
+    const userKeys = await db
+      .select()
+      .from(aiKeys)
+      .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true)));
+
+    // Decrypt keys
+    let gemini_api_key = "";
+    let openai_api_key = "";
+    let higgsfield_api_key = "";
+    let higgsfield_access_key = "";
+
+    for (const key of userKeys) {
+      if (key.provider === "google") {
+        gemini_api_key = decrypt(key.encryptedKey, key.iv);
+      } else if (key.provider === "openai") {
+        openai_api_key = decrypt(key.encryptedKey, key.iv);
+      } else if (key.provider === "higgsfield") {
+        const decrypted = decrypt(key.encryptedKey, key.iv);
+        try {
+          const parsed = JSON.parse(decrypted);
+          if (parsed?.apiKey) higgsfield_api_key = parsed.apiKey;
+          if (parsed?.accessKey) higgsfield_access_key = parsed.accessKey;
+        } catch {
+          higgsfield_api_key = decrypted;
+        }
+      }
+    }
+
+    // 5. Trigger specialized Regeneration Webhook with NEW postId
     const webhookUrl = process.env.n8n_Regenerate_Webhook;
     if (webhookUrl) {
       await fetch(webhookUrl, {
@@ -207,9 +240,16 @@ export async function regeneratePost(postId: string, projectId: string, refineme
           projectId,
           projectName: projectData?.name || "Unknown Project",
           projectDescription: projectData?.productDesc || "",
+          userId: user.id,
           postId: newPost.id, // THE NEW ID
           parentPostId: postId,
+          image_prompt: originalImagePrompt,
           refinementPrompt: refinementPrompt || "Default Regeneration",
+          selected_provider: selectedProvider || "auto",
+          gemini_api_key,
+          openai_api_key,
+          higgsfield_api_key,
+          higgsfield_access_key,
           currentImageUrl: parentPost?.imageUrl,
           currentVideoUrl: parentPost?.videoUrl,
           currentCaption: parentPost?.caption

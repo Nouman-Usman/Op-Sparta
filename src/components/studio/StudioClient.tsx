@@ -71,6 +71,7 @@ export default function StudioClient({
   const [editedCaption, setEditedCaption] = useState("");
   const [isRefining, setIsRefining] = useState(false);
   const [refinementPrompt, setRefinementPrompt] = useState("");
+  const [selectedRegenerateProvider, setSelectedRegenerateProvider] = useState("");
   const [confirmConfig, setConfirmConfig] = useState<{
     open: boolean;
     title: string;
@@ -87,13 +88,15 @@ export default function StudioClient({
     if (!selectedPost) return;
     setIsRefining(false);
     const prompt = refinementPrompt;
-    setRefinementPrompt(""); 
-    
+    const provider = selectedRegenerateProvider;
+    setRefinementPrompt("");
+    setSelectedRegenerateProvider("");
+
     startTransition(async () => {
-      const result = await regeneratePost(selectedPost.id, project.id, prompt);
+      const result = await regeneratePost(selectedPost.id, project.id, prompt, provider);
       if (result.success) {
         toast.success("New variant initiated.");
-        // The result now returns newPostId, but since initialPosts won't have it 
+        // The result now returns newPostId, but since initialPosts won't have it
         // until the next poll/refresh, we'll let the polling handle the auto-focus
         // if we want, OR we can optimismically set it if we had the full object.
         // For now, let's just let the gallery update.
@@ -696,7 +699,7 @@ export default function StudioClient({
               What changes do you want to see in this asset? Your refinement prompt will be sent to the synthesis engine.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <textarea
               value={refinementPrompt}
               onChange={(e) => setRefinementPrompt(e.target.value)}
@@ -704,10 +707,43 @@ export default function StudioClient({
               placeholder="e.g. Make it more vibrant, add a neon glow, or change the background to a futuristic city..."
               autoFocus
             />
+
+            <div>
+              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block mb-3">
+                Select Engine
+              </label>
+              <div className="space-y-2">
+                {activeProviders.map((provider) => (
+                  <button
+                    key={provider}
+                    onClick={() => setSelectedRegenerateProvider(provider)}
+                    className={cn(
+                      "w-full flex items-center gap-3 p-3 rounded-xl transition-all",
+                      selectedRegenerateProvider === provider
+                        ? "bg-accent text-accent-foreground"
+                        : "bg-muted text-white hover:bg-zinc-800"
+                    )}
+                  >
+                    <Sparkles size={14} />
+                    <span className="text-sm font-semibold">
+                      {provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI GPT' : provider}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setRefinementPrompt("")}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmRegenerate}>
+            <AlertDialogCancel onClick={() => {
+              setRefinementPrompt("");
+              setSelectedRegenerateProvider("");
+            }}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRegenerate}
+              disabled={!selectedRegenerateProvider}
+            >
               Trigger Regeneration
             </AlertDialogAction>
           </AlertDialogFooter>
