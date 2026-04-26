@@ -66,3 +66,17 @@ export const posts = pgTable('posts', {
   lastSyncedAt: timestamp('last_synced_at'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// 5. Prompts (Version tracking and prompt storage)
+export const prompts = pgTable('prompts', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  postId: text('post_id').notNull(),
+  projectId: text('project_id').notNull(),
+  userId: text('user_id').notNull(),
+  prompt: text('prompt').notNull(),
+  version: text('version').notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => [
+  uniqueIndex("prompt_post_version_idx").on(table.postId, table.version),
+  uniqueIndex("prompt_post_created_idx").on(table.postId, table.createdAt),
+]);
