@@ -2,11 +2,11 @@
 
 import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { 
-  Instagram, 
-  CheckCircle2, 
-  Clock, 
-  Zap, 
+import {
+  Instagram,
+  CheckCircle2,
+  Clock,
+  Zap,
   Sparkles,
   ArrowLeft,
   Loader2,
@@ -27,7 +27,8 @@ import {
   Copy,
   Edit3,
   Check,
-  X
+  X,
+  Maximize2
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -72,6 +73,7 @@ export default function StudioClient({
   const [isRefining, setIsRefining] = useState(false);
   const [refinementPrompt, setRefinementPrompt] = useState("");
   const [selectedRegenerateProvider, setSelectedRegenerateProvider] = useState("");
+  const [showFullscreenPreview, setShowFullscreenPreview] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     open: boolean;
     title: string;
@@ -334,10 +336,13 @@ export default function StudioClient({
                             </div>
                           </div>
                         ) : post.imageUrl ? (
-                          <Image 
-                            src={post.imageUrl} 
-                            alt="Post preview" 
-                            fill 
+                          <Image
+                            src={post.imageUrl}
+                            alt="Post preview"
+                            fill
+                            quality={75}
+                            priority={false}
+                            sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
                             className="object-cover group-hover:scale-110 transition-transform duration-1000"
                           />
                         ) : (
@@ -428,7 +433,7 @@ export default function StudioClient({
               <div className="lg:sticky lg:top-48 space-y-8">
                 <div className="bg-card rounded-[2.5rem] p-8 lg:p-10 space-y-10">
                   {/* Asset Swipe Preview */}
-                  <div className="relative aspect-square w-full overflow-hidden rounded-[2.5rem] bg-muted group">
+                  <div className="relative aspect-square w-full overflow-hidden rounded-[2.5rem] bg-muted group cursor-pointer" onDoubleClick={() => setShowFullscreenPreview(true)}>
                     {selectedPost.status === 'generating' ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center bg-zinc-900/50 backdrop-blur-sm">
                         <div className="h-16 w-16 rounded-3xl bg-accent/10 flex items-center justify-center mb-8">
@@ -448,12 +453,15 @@ export default function StudioClient({
                         className="h-full w-full object-cover transition-all duration-700" 
                       />
                     ) : selectedPost.imageUrl ? (
-                      <Image 
+                      <Image
                         key={selectedPost.imageUrl}
-                        src={selectedPost.imageUrl} 
-                        alt="Preview" 
-                        fill 
-                        className="object-cover transition-all duration-700" 
+                        src={selectedPost.imageUrl}
+                        alt="Preview"
+                        fill
+                        quality={90}
+                        priority={true}
+                        sizes="(max-width: 768px) 100vw, 400px"
+                        className="object-cover transition-all duration-700"
                       />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
@@ -483,7 +491,7 @@ export default function StudioClient({
                     {/* Pagination Indicators */}
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/5">
                       {initialPosts.map((p, i) => (
-                        <div 
+                        <div
                           key={p.id}
                           className={cn(
                             "h-1 rounded-full transition-all duration-500",
@@ -492,6 +500,14 @@ export default function StudioClient({
                         />
                       ))}
                     </div>
+
+                    {/* Fullscreen Preview Button */}
+                    <button
+                      onClick={() => setShowFullscreenPreview(true)}
+                      className="absolute top-4 right-4 h-10 w-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-accent-foreground transition-all opacity-0 group-hover:opacity-100"
+                    >
+                      <Maximize2 size={18} />
+                    </button>
                   </div>
 
                   <div className="space-y-4">
@@ -751,8 +767,8 @@ export default function StudioClient({
       </AlertDialog>
 
       {/* Confirmation Dialog */}
-      <AlertDialog 
-        open={confirmConfig.open} 
+      <AlertDialog
+        open={confirmConfig.open}
         onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, open }))}
       >
         <AlertDialogContent>
@@ -773,6 +789,87 @@ export default function StudioClient({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Fullscreen Preview Modal */}
+      {showFullscreenPreview && selectedPost && (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center bg-background/95 backdrop-blur-2xl p-6">
+          <button
+            onClick={() => setShowFullscreenPreview(false)}
+            className="absolute top-8 right-8 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-all z-10"
+          >
+            <X size={24} />
+          </button>
+
+          <div className="relative w-full h-full max-w-6xl max-h-[90vh] flex flex-col">
+            {/* Asset Display */}
+            <div className="flex-1 relative overflow-hidden rounded-[2.5rem] bg-card">
+              {selectedPost.status === 'generating' ? (
+                <div className="absolute inset-0 flex flex-col items-center justify-center text-center bg-zinc-900/50 backdrop-blur-sm">
+                  <div className="h-16 w-16 rounded-3xl bg-accent/10 flex items-center justify-center mb-8">
+                    <Loader2 size={32} className="text-accent animate-spin" />
+                  </div>
+                  <h3 className="text-2xl font-display font-bold text-white mb-2 uppercase tracking-tighter">Synthesizing...</h3>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Neural Core Process</p>
+                </div>
+              ) : selectedPost.videoUrl ? (
+                <video
+                  src={selectedPost.videoUrl}
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              ) : selectedPost.imageUrl ? (
+                <Image
+                  src={selectedPost.imageUrl}
+                  alt="Fullscreen preview"
+                  fill
+                  quality={95}
+                  priority={true}
+                  sizes="90vw"
+                  className="object-contain"
+                />
+              ) : (
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <Sparkles size={48} className="text-zinc-800 mb-6" />
+                  <p className="text-sm text-zinc-500">No asset data</p>
+                </div>
+              )}
+            </div>
+
+            {/* Navigation and Info */}
+            <div className="mt-6 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => navigatePost('prev')}
+                  className="h-12 w-12 rounded-full bg-white/10 hover:bg-accent flex items-center justify-center text-white transition-all"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+                <span className="text-sm text-zinc-400">
+                  {initialPosts.findIndex(p => p.id === selectedPost.id) + 1} of {initialPosts.length}
+                </span>
+                <button
+                  onClick={() => navigatePost('next')}
+                  className="h-12 w-12 rounded-full bg-white/10 hover:bg-accent flex items-center justify-center text-white transition-all"
+                >
+                  <ChevronRight size={20} />
+                </button>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <span className="text-sm text-zinc-400 capitalize">{selectedPost.status}</span>
+                <div className={cn(
+                  "h-2 w-2 rounded-full",
+                  selectedPost.status === 'published' ? "bg-emerald-500" :
+                  selectedPost.status === 'generating' ? "bg-accent animate-ping" : "bg-amber-500"
+                )} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
