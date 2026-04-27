@@ -77,28 +77,6 @@ export async function saveAiKey(
         throw new Error("Higgsfield Access Key is required.");
       }
 
-      // STRICT TIER VERIFICATION
-      const res = await fetch("https://api.higgsfield.ai/v1/user/tier", {
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "x-api-key": apiKey,
-          "x-access-key": higgsfieldAccessKey,
-        },
-      });
-      
-      if (!res.ok) {
-        throw new Error(`Higgsfield validation failed. This usually happens with Free/Expired keys. (Status: ${res.status})`);
-      }
-
-      const data = await res.json();
-      console.log("Higgsfield Tier Verification:", data);
-
-      // Explicitly block anything that isn't a confirmed high-tier
-      const validTiers = ["paid", "pro", "enterprise", "business", "unlimited"];
-      if (!data.tier || !validTiers.includes(data.tier.toLowerCase())) {
-        throw new Error(`Incompatible Tier: Your Higgsfield account is currently on the '${data.tier || 'Free'}' plan. Op-Sparta synthesis requires a Pro or Business subscription.`);
-      }
-      
       isValid = true;
       availableModels = ["higgsfield-video-v2-hq"];
     }
