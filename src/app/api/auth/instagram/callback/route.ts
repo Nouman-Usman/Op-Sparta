@@ -84,9 +84,9 @@ export async function GET(request: Request) {
         }
       });
 
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/settings?success=instagram_connected`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/settings?success=instagram_connected`);
   } catch (error: any) {
     console.error("Instagram OAuth Error:", error);
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'}/settings?error=${encodeURIComponent(error.message)}`);
+    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_SITE_URL}/settings?error=${encodeURIComponent(error.message)}`);
   }
 }
