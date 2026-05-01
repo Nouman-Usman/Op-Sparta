@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sparkles, Settings, PlusCircle, Zap } from "lucide-react";
+import { Home, Sparkles, Settings, PlusCircle, Zap, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Home", href: "/overview", icon: Home },
   { name: "Studio", href: "/studio", icon: Sparkles },
+  { name: "Upload", href: "/upload", icon: Upload },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
@@ -36,7 +37,7 @@ export function DashboardMobileNav() {
       </header>
 
       <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-3 px-1 py-1.5">
+        <div className="grid grid-cols-4 px-1 py-1.5">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
@@ -48,8 +49,8 @@ export function DashboardMobileNav() {
                   isActive ? "text-accent bg-accent/10" : "text-muted-foreground"
                 )}
               >
-                <item.icon size={16} />
-                <span>{item.name}</span>
+                <item.icon size={14} />
+                <span className="text-[9px]">{item.name}</span>
               </Link>
             );
           })}

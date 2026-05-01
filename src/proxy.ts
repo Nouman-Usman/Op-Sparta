@@ -17,6 +17,7 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/auth') ||
     pathname.startsWith('/forgot-password') ||
     pathname.startsWith('/api/webhooks') ||
+    pathname.startsWith('/api/cron') ||
     pathname.includes('.')  // static files
 
   // If logged in and hitting login page, redirect to dashboard

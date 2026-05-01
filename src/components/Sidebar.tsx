@@ -3,15 +3,17 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
-import { 
-  LayoutDashboard, 
-  Sparkles, 
-  BarChart3, 
-  Settings, 
+import {
+  LayoutDashboard,
+  Sparkles,
+  BarChart3,
+  Settings,
   PlusCircle,
   Zap,
   LogOut,
-  Loader2
+  Loader2,
+  Upload,
+  CalendarDays,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -19,6 +21,8 @@ import { createClient } from "@/utils/supabase/client";
 const navigation = [
   { name: "Dashboard", href: "/overview", icon: LayoutDashboard },
   { name: "Content Studio", href: "/studio", icon: Sparkles },
+  { name: "Upload", href: "/upload", icon: Upload },
+  { name: "Planner", href: "/planner", icon: CalendarDays },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];
 

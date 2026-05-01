@@ -47,8 +47,11 @@ export const projects = pgTable('projects', {
 // 4. Posts (The generated assets)
 export const posts = pgTable('posts', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
-  projectId: text('project_id').notNull(),
+  projectId: text('project_id'),
   userId: text('user_id').notNull(),
+  source: text('source').default('studio').notNull(),
+  hashtags: text('hashtags').array(),
+  targetTimezone: text('target_timezone'),
   imageUrl: text('image_url'),
   videoUrl: text('video_url'),
   caption: text('caption'),
