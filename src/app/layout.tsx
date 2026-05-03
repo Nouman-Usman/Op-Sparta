@@ -18,7 +18,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "Operation Sparta | AI Social Engine",
+  title: "Sparta | AI Social Engine",
   description: "Convert products into viral social content automatically",
 };
 

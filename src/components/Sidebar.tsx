@@ -14,6 +14,7 @@ import {
   Loader2,
   Upload,
   CalendarDays,
+  Images,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
@@ -22,6 +23,7 @@ const navigation = [
   { name: "Dashboard", href: "/overview", icon: LayoutDashboard },
   { name: "Content Studio", href: "/studio", icon: Sparkles },
   { name: "Upload", href: "/upload", icon: Upload },
+  { name: "Assets", href: "/assets", icon: Images },
   { name: "Planner", href: "/planner", icon: CalendarDays },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
 ];

@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Sparkles, Settings, PlusCircle, Zap, Upload } from "lucide-react";
+import { Home, Sparkles, Settings, PlusCircle, Zap, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { name: "Home", href: "/overview", icon: Home },
   { name: "Studio", href: "/studio", icon: Sparkles },
-  { name: "Upload", href: "/upload", icon: Upload },
+  { name: "Assets", href: "/assets", icon: Images },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
