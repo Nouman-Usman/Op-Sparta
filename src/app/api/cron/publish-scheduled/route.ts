@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { posts, users } from "@/db/schema";
 import { eq, and, lte, isNotNull } from "drizzle-orm";
 import { InstagramService } from "@/lib/social/instagram";
-import { toInstagramImageUrl } from "@/lib/media";
 
 // Vercel cron jobs invoke routes with GET
 export async function GET(req: Request) {
@@ -53,7 +52,7 @@ export async function GET(req: Request) {
         );
       } else if (post.imageUrl) {
         igResult = await InstagramService.publishPhoto(
-          { imageUrl: toInstagramImageUrl(post.imageUrl), caption: post.caption ?? "" },
+          { imageUrl: post.imageUrl, caption: post.caption ?? "" },
           creds
         );
       } else {

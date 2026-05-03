@@ -4,7 +4,6 @@ import { db } from "@/db";
 import { posts, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { InstagramService } from "@/lib/social/instagram";
-import { toInstagramImageUrl } from "@/lib/media";
 import { revalidatePath } from "next/cache";
 
 export async function approveAndPost(postId: string) {
@@ -39,7 +38,7 @@ export async function approveAndPost(postId: string) {
       }
 
       result = await InstagramService.publishPhoto({
-        imageUrl: toInstagramImageUrl(post.imageUrl),
+        imageUrl: post.imageUrl,
         caption: post.caption || ""
       }, creds);
     }
