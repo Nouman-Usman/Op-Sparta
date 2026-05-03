@@ -45,31 +45,53 @@ export class InstagramService {
 
       const creationId = containerData.id;
 
-      // Step 2: Publish Container
-      const publishResponse = await fetch(
-        `https://graph.facebook.com/v19.0/${finalId}/media_publish`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            creation_id: creationId,
-            access_token: finalToken
-          })
+      // Step 2: Poll until container is ready (eventual consistency)
+      const maxStatusChecks = 15; // 30 seconds max
+      for (let i = 0; i < maxStatusChecks; i++) {
+        const statusRes = await fetch(
+          `https://graph.facebook.com/v19.0/${creationId}?fields=status_code&access_token=${finalToken}`
+        );
+        const statusData = await statusRes.json();
+        const code = statusData?.status_code;
+        if (code === "FINISHED" || code === "READY") break;
+        if (code === "ERROR") throw new Error("Instagram failed to process the photo container.");
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+
+      // Step 3: Publish Container (with retry for eventual consistency)
+      const maxAttempts = 5;
+      for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+        const publishResponse = await fetch(
+          `https://graph.facebook.com/v19.0/${finalId}/media_publish`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              creation_id: creationId,
+              access_token: finalToken
+            })
+          }
+        );
+
+        const publishData = await publishResponse.json();
+        if (!publishData.error) {
+          // Step 4: Fetch Permalink
+          const permalinkResponse = await fetch(`https://graph.facebook.com/v19.0/${publishData.id}?fields=permalink&access_token=${finalToken}`);
+          const permalinkData = await permalinkResponse.json();
+          return {
+            success: true,
+            postId: publishData.id,
+            permalink: permalinkData.permalink
+          };
         }
-      );
 
-      const publishData = await publishResponse.json();
-      if (publishData.error) throw new Error(publishData.error.message);
+        const msg = String(publishData.error?.message ?? "");
+        const canRetry = msg.includes("Media ID is not available") || msg.includes("not found");
+        if (!canRetry || attempt === maxAttempts) throw new Error(publishData.error.message);
+        await new Promise((r) => setTimeout(r, 3000 * attempt));
+      }
 
-      // Step 3: Fetch Permalink
-      const permalinkResponse = await fetch(`https://graph.facebook.com/v19.0/${publishData.id}?fields=permalink&access_token=${finalToken}`);
-      const permalinkData = await permalinkResponse.json();
-
-      return { 
-        success: true, 
-        postId: publishData.id,
-        permalink: permalinkData.permalink
-      };
+      throw new Error("Failed to publish photo to Instagram.");
     } catch (error: any) {
       return { success: false, error: error.message };
     }
