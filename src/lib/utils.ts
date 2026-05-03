@@ -6,14 +6,19 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function getURL() {
+  // In the browser, always derive from the actual origin so dev/prod/preview all work correctly.
+  if (typeof window !== "undefined" && window.location.origin) {
+    const origin = window.location.origin;
+    return origin.endsWith("/") ? origin : `${origin}/`;
+  }
+
+  // Server-side: fall back to explicit env vars.
   let url =
-    process?.env?.NEXT_PUBLIC_SITE_URL ?? // Set this to your site URL in production env.
-    process?.env?.NEXT_PUBLIC_VERCEL_URL ?? // Automatically set by Vercel.
-    (typeof window !== "undefined" && window.location.origin ? window.location.origin : "http://localhost:3000/");
-  
-  // Make sure to include `https://` when not localhost.
+    process?.env?.NEXT_PUBLIC_SITE_URL ??
+    process?.env?.NEXT_PUBLIC_VERCEL_URL ??
+    "http://localhost:3000/";
+
   url = url.includes("http") ? url : `https://${url}`;
-  // Make sure to include a trailing `/`.
   url = url.endsWith("/") ? url : `${url}/`;
   return url;
 }
