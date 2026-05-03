@@ -5,6 +5,7 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { Zap, Loader2, Mail, Lock, ArrowRight, AlertCircle, User, CheckCircle } from "lucide-react";
 import Link from "next/link";
+import { getURL } from "@/lib/utils";
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
@@ -63,7 +64,7 @@ export default function LoginPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}auth/callback`,
+          emailRedirectTo: `${getURL()}auth/callback`,
           data: {
             full_name: username.trim(),
             username: username.trim().toLowerCase().replace(/\s+/g, '_'),

@@ -2,15 +2,21 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { db } from '@/db'
 import { users } from '@/db/schema'
+import { getURL } from '@/lib/utils'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/overview'
+  let next = searchParams.get('next') ?? 'overview'
+  
+  // Remove leading slash if present to avoid double slashes with getURL()
+  if (next.startsWith('/')) {
+    next = next.substring(1);
+  }
 
   if (code) {
     const supabase = await createClient()
-    if (!supabase) return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    if (!supabase) return NextResponse.redirect(`${getURL()}auth/auth-code-error`)
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
@@ -29,18 +35,9 @@ export async function GET(request: Request) {
           set: { fullName: chosenUsername }
         });
 
-      const forwardedHost = request.headers.get('x-forwarded-host')
-      const isLocalEnv = process.env.NODE_ENV === 'development'
-
-      if (isLocalEnv) {
-        return NextResponse.redirect(`${origin}${next}`)
-      } else if (forwardedHost) {
-        return NextResponse.redirect(`https://${forwardedHost}${next}`)
-      } else {
-        return NextResponse.redirect(`${origin}${next}`)
-      }
+      return NextResponse.redirect(`${getURL()}${next}`)
     }
   }
 
-  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+  return NextResponse.redirect(`${getURL()}auth/auth-code-error`)
 }
