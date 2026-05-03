@@ -2,21 +2,18 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { db } from '@/db'
 import { users } from '@/db/schema'
-import { getURL } from '@/lib/utils'
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url)
+  const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  let next = searchParams.get('next') ?? 'overview'
+  const next = searchParams.get('next') ?? 'overview'
   
-  // Remove leading slash if present to avoid double slashes with getURL()
-  if (next.startsWith('/')) {
-    next = next.substring(1);
-  }
+  // Ensure 'next' starts with a slash if it's a path
+  const nextPath = next.startsWith('/') ? next : `/${next}`
 
   if (code) {
     const supabase = await createClient()
-    if (!supabase) return NextResponse.redirect(`${getURL()}auth/auth-code-error`)
+    if (!supabase) return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 
     const { data, error } = await supabase.auth.exchangeCodeForSession(code)
 
@@ -35,9 +32,9 @@ export async function GET(request: Request) {
           set: { fullName: chosenUsername }
         });
 
-      return NextResponse.redirect(`${getURL()}${next}`)
+      return NextResponse.redirect(`${origin}${nextPath}`)
     }
   }
 
-  return NextResponse.redirect(`${getURL()}auth/auth-code-error`)
+  return NextResponse.redirect(`${origin}/auth/auth-code-error`)
 }

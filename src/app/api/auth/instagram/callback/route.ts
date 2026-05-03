@@ -1,22 +1,20 @@
 import { createClient } from "@/utils/supabase/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
-import { getURL } from "@/lib/utils";
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
+  const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
 
   if (!code) {
-    return NextResponse.redirect(`${getURL()}settings?error=no_code`);
+    return NextResponse.redirect(`${origin}/settings?error=no_code`);
   }
 
   try {
     const appId = process.env.INSTAGRAM_APP_ID;
     const appSecret = process.env.INSTAGRAM_APP_SECRET;
-    const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || `${getURL()}api/auth/instagram/callback`;
+    const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || `${origin}/api/auth/instagram/callback`;
 
     // 1. Exchange code for short-lived token
     const tokenResponse = await fetch(
@@ -85,9 +83,9 @@ export async function GET(request: Request) {
         }
       });
 
-    return NextResponse.redirect(`${getURL()}settings?success=instagram_connected`);
+    return NextResponse.redirect(`${origin}/settings?success=instagram_connected`);
   } catch (error: any) {
     console.error("Instagram OAuth Error:", error);
-    return NextResponse.redirect(`${getURL()}settings?error=${encodeURIComponent(error.message)}`);
+    return NextResponse.redirect(`${origin}/settings?error=${encodeURIComponent(error.message)}`);
   }
 }

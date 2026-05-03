@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { getURL } from "@/lib/utils";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { origin } = new URL(request.url);
   const appId = process.env.INSTAGRAM_APP_ID;
-  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || `${getURL()}api/auth/instagram/callback`;
+  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || `${origin}/api/auth/instagram/callback`;
   const configId = process.env.INSTAGRAM_CONFIG_ID;
   
   if (!appId || !configId) {
