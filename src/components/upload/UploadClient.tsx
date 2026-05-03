@@ -17,6 +17,40 @@ import { analyzeImageAndGenerate } from "@/app/actions/analyze-image";
 import { autoSchedulePost } from "@/app/actions/schedule";
 import { TimezoneSetupModal } from "@/components/TimezoneSetupModal";
 
+// Compress and resize an image to a JPEG ≤ 5 MB so it always meets Instagram's
+// 8 MB limit. Resizes to 1080px max width (Instagram's recommended resolution).
+async function compressForInstagram(file: File): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const objectUrl = URL.createObjectURL(file);
+
+    img.onload = () => {
+      const MAX = 1080;
+      const ratio = Math.min(MAX / img.width, MAX / img.height, 1);
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(img.width * ratio);
+      canvas.height = Math.round(img.height * ratio);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(objectUrl); return resolve(file); }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(objectUrl);
+          if (!blob) return resolve(file);
+          const name = file.name.replace(/\.[^.]+$/, ".jpg");
+          resolve(new File([blob], name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.88
+      );
+    };
+
+    img.onerror = () => { URL.revokeObjectURL(objectUrl); resolve(file); };
+    img.src = objectUrl;
+  });
+}
+
 function formatScheduled(iso: string, timezone: string): string {
   return new Intl.DateTimeFormat("en-US", {
     timeZone: timezone,
@@ -59,15 +93,43 @@ export function UploadClient({
 
   // ─── File Handling ────────────────────────────────────────────────────────────
 
-  const handleFileSelect = (file: File) => {
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError("File too large. Maximum size is 10 MB.");
+  const handleFileSelect = async (file: File) => {
+    // Instagram-supported formats that Canvas can convert to JPEG
+    const supported = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+    if (!supported.includes(file.type)) {
+      const ext = file.name.split(".").pop()?.toUpperCase() ?? file.type;
+      setUploadError(`${ext} files aren't supported. Please upload a JPEG or PNG image.`);
       return;
     }
-    if (!file.type.startsWith("image/")) {
-      setUploadError("Only image files are supported.");
+
+    // Dimension + aspect-ratio check (requires loading the image)
+    const dimCheck = await new Promise<{ ok: boolean; error?: string }>((res) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const { width, height } = img;
+        if (width < 320 || height < 320) {
+          res({ ok: false, error: `Image too small (${width}×${height}px). Instagram requires at least 320×320px.` });
+          return;
+        }
+        const ratio = width / height;
+        if (ratio < 0.8 - 0.01 || ratio > 1.91 + 0.01) {
+          const dir = ratio < 0.8 ? "portrait is too tall" : "landscape is too wide";
+          res({ ok: false, error: `Aspect ratio ${dir} (${ratio.toFixed(2)}:1). Instagram accepts 4:5 portrait to 1.91:1 landscape.` });
+          return;
+        }
+        res({ ok: true });
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); res({ ok: true }); };
+      img.src = url;
+    });
+
+    if (!dimCheck.ok) {
+      setUploadError(dimCheck.error!);
       return;
     }
+
     setUploadError(null);
     setSelectedFile(file);
     setPreview(URL.createObjectURL(file));
@@ -77,7 +139,7 @@ export function UploadClient({
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
-    if (file) handleFileSelect(file);
+    if (file) void handleFileSelect(file);
   };
 
   // ─── Main pipeline: upload → analyze → auto-schedule ─────────────────────────
@@ -93,26 +155,28 @@ export function UploadClient({
     setUploadError(null);
     startProcessing(async () => {
       try {
-        // 1. Upload to Supabase Storage
+        // 1. Compress to JPEG ≤ 5 MB before uploading
+        const fileToUpload = await compressForInstagram(selectedFile);
+
+        // 2. Upload to Supabase Storage
         const supabase = createClient();
-        const ext = selectedFile.name.split(".").pop();
-        const fileName = `${crypto.randomUUID()}_${Date.now()}.${ext}`;
+        const fileName = `${crypto.randomUUID()}_${Date.now()}.jpg`;
         const filePath = `uploads/${userId}/${fileName}`;
 
         const { error: uploadErr } = await supabase.storage
           .from("project-assets")
-          .upload(filePath, selectedFile);
+          .upload(filePath, fileToUpload);
         if (uploadErr) throw new Error(uploadErr.message);
 
         const { data: { publicUrl } } = supabase.storage
           .from("project-assets")
           .getPublicUrl(filePath);
 
-        // 2. AI analysis — generates caption, hashtags, creates post record
+        // 3. AI analysis — generates caption, hashtags, creates post record
         const analyzeResult = await analyzeImageAndGenerate(publicUrl);
         if (!analyzeResult.success) throw new Error(analyzeResult.error);
 
-        // 3. Auto-schedule the post
+        // 4. Auto-schedule the post
         const scheduleResult = await autoSchedulePost(analyzeResult.postId);
         if (!scheduleResult.success) {
           if (scheduleResult.error === "NO_TIMEZONE") {
@@ -122,7 +186,7 @@ export function UploadClient({
           throw new Error(scheduleResult.error);
         }
 
-        // 4. Show done screen
+        // 5. Show done screen
         setResultCaption(analyzeResult.analysis.caption);
         setResultHashtags(analyzeResult.analysis.hashtags);
         setResultImageUrl(publicUrl);
@@ -224,7 +288,7 @@ export function UploadClient({
                   type="file"
                   accept="image/*"
                   className="hidden"
-                  onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+                  onChange={(e) => { if (e.target.files?.[0]) void handleFileSelect(e.target.files[0]); }}
                 />
               </div>
             ) : (
