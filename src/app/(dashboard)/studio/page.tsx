@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { posts, projects, aiKeys } from "@/db/schema";
+import { posts, projects, aiKeys, users } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { createClient } from "@/utils/supabase/server";
 import { redirect } from "next/navigation";
@@ -45,19 +45,28 @@ export default async function StudioPage({
     .where(eq(posts.projectId, projectId))
     .orderBy(desc(posts.createdAt));
 
-  // Fetch Active AI Providers
-  const activeKeys = await db
-    .select({ provider: aiKeys.provider })
-    .from(aiKeys)
-    .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true)));
+  // Fetch Active AI Providers and user timezone in parallel
+  const [activeKeys, userRow] = await Promise.all([
+    db
+      .select({ provider: aiKeys.provider })
+      .from(aiKeys)
+      .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true))),
+    db
+      .select({ timezone: users.timezone })
+      .from(users)
+      .where(eq(users.id, user.id))
+      .limit(1),
+  ]);
 
   const activeProviders = activeKeys.map(k => k.provider);
+  const userTimezone = userRow[0]?.timezone ?? null;
 
   return (
-    <StudioClient 
-      project={project} 
-      initialPosts={projectPosts} 
+    <StudioClient
+      project={project}
+      initialPosts={projectPosts}
       activeProviders={activeProviders}
+      userTimezone={userTimezone}
     />
   );
 }

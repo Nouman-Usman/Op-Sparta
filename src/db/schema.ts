@@ -10,6 +10,7 @@ export const users = pgTable('users', {
   instagramAppSecret: text('instagram_app_secret'),
   instagramAccessToken: text('instagram_access_token'),
   instagramPageId: text('instagram_page_id'),
+  timezone: text('timezone'),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

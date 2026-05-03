@@ -4,8 +4,10 @@ import { posts, users } from "@/db/schema";
 import { eq, and, lte, isNotNull } from "drizzle-orm";
 import { InstagramService } from "@/lib/social/instagram";
 
-export async function POST(req: Request) {
-  if (req.headers.get("authorization") !== `Bearer ${process.env.CRON_SECRET}`) {
+// Vercel cron jobs invoke routes with GET
+export async function GET(req: Request) {
+  const authHeader = req.headers.get("authorization");
+  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
@@ -23,7 +25,7 @@ export async function POST(req: Request) {
     );
 
   if (duePosts.length === 0) {
-    return NextResponse.json({ processed: 0 });
+    return NextResponse.json({ processed: 0, message: "No posts due" });
   }
 
   const results = await Promise.allSettled(
@@ -33,32 +35,54 @@ export async function POST(req: Request) {
         .from(users)
         .where(eq(users.id, post.userId));
 
-      if (user?.instagramAccessToken && user?.instagramPageId && post.imageUrl) {
-        const igResult = await InstagramService.publishPhoto(
-          { imageUrl: post.imageUrl, caption: post.caption ?? "" },
-          { accessToken: user.instagramAccessToken, businessId: user.instagramPageId }
-        );
-
-        if (igResult.success) {
-          await db
-            .update(posts)
-            .set({
-              status: "published",
-              instagramPostId: igResult.postId,
-              instagramPermalink: igResult.permalink,
-            })
-            .where(eq(posts.id, post.id));
-          return { postId: post.id, published: true, platform: "instagram" };
-        }
+      if (!user?.instagramAccessToken || !user?.instagramPageId) {
+        return { postId: post.id, published: false, reason: "no_instagram_credentials" };
       }
 
-      await db.update(posts).set({ status: "published" }).where(eq(posts.id, post.id));
-      return { postId: post.id, published: true, platform: "local" };
+      const creds = {
+        accessToken: user.instagramAccessToken,
+        businessId: user.instagramPageId,
+      };
+
+      let igResult;
+      if (post.videoUrl) {
+        igResult = await InstagramService.publishVideo(
+          { videoUrl: post.videoUrl, caption: post.caption ?? "" },
+          creds
+        );
+      } else if (post.imageUrl) {
+        igResult = await InstagramService.publishPhoto(
+          { imageUrl: post.imageUrl, caption: post.caption ?? "" },
+          creds
+        );
+      } else {
+        return { postId: post.id, published: false, reason: "no_media_url" };
+      }
+
+      if (igResult.success) {
+        await db
+          .update(posts)
+          .set({
+            status: "published",
+            instagramPostId: igResult.postId,
+            instagramPermalink: igResult.permalink,
+          })
+          .where(eq(posts.id, post.id));
+        return { postId: post.id, published: true };
+      }
+
+      // Keep as pending so the next cron invocation retries
+      console.error(`[cron] Failed to publish post ${post.id}:`, igResult.error);
+      return { postId: post.id, published: false, reason: igResult.error };
     })
   );
 
-  return NextResponse.json({
-    processed: duePosts.length,
-    results: results.map((r) => (r.status === "fulfilled" ? r.value : { error: r.reason?.message })),
-  });
+  const summary = results.map((r) =>
+    r.status === "fulfilled" ? r.value : { published: false, reason: r.reason?.message }
+  );
+
+  const publishedCount = summary.filter((r) => r.published).length;
+  console.log(`[cron] Processed ${duePosts.length} due posts, published ${publishedCount}`);
+
+  return NextResponse.json({ processed: duePosts.length, published: publishedCount, results: summary });
 }

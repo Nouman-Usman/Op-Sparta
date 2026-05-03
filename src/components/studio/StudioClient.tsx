@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useEffect } from "react";
+import { useState, useTransition, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Instagram,
@@ -28,11 +28,13 @@ import {
   Edit3,
   Check,
   X,
-  Maximize2
+  Maximize2,
+  CalendarClock,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { approveAndPost } from "@/app/actions/publish";
+import { autoSchedulePost } from "@/app/actions/schedule";
 import { triggerN8nGeneration, deletePost, regeneratePost, updatePostCaption } from "@/app/actions/projects";
 import { syncPostMetrics } from "@/app/actions/analytics";
 import { cn } from "@/lib/utils";
@@ -55,15 +57,31 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { TimezoneSetupModal } from "@/components/TimezoneSetupModal";
 
-export default function StudioClient({ 
-  project, 
+function formatScheduled(isoOrDate: string | Date, timezone: string | null): string {
+  const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
+  return d.toLocaleString("en-US", {
+    timeZone: timezone ?? "UTC",
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+}
+
+export default function StudioClient({
+  project,
   initialPosts,
-  activeProviders = []
-}: { 
-  project: any, 
-  initialPosts: any[],
-  activeProviders?: string[]
+  activeProviders = [],
+  userTimezone,
+}: {
+  project: any;
+  initialPosts: any[];
+  activeProviders?: string[];
+  userTimezone: string | null;
 }) {
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -80,6 +98,12 @@ export default function StudioClient({
     description: string;
     onConfirm: () => void;
   }>({ open: false, title: "", description: "", onConfirm: () => {} });
+
+  // Scheduling state
+  const [localTimezone, setLocalTimezone] = useState(userTimezone);
+  const [timezoneModalOpen, setTimezoneModalOpen] = useState(false);
+  const pendingPostIdRef = useRef<string | null>(null);
+
   const router = useRouter();
 
   const handleRegenerate = async (postId: string) => {
@@ -98,24 +122,18 @@ export default function StudioClient({
       const result = await regeneratePost(selectedPost.id, project.id, prompt, provider);
       if (result.success) {
         toast.success("New variant initiated.");
-        // The result now returns newPostId, but since initialPosts won't have it
-        // until the next poll/refresh, we'll let the polling handle the auto-focus
-        // if we want, OR we can optimismically set it if we had the full object.
-        // For now, let's just let the gallery update.
       } else {
         toast.error(result.error);
       }
     });
   };
 
-  const navigatePost = (direction: 'prev' | 'next') => {
-    const currentIndex = initialPosts.findIndex(p => p.id === selectedPost?.id);
+  const navigatePost = (direction: "prev" | "next") => {
+    const currentIndex = initialPosts.findIndex((p) => p.id === selectedPost?.id);
     if (currentIndex === -1) return;
-    
-    let nextIndex = direction === 'next' ? currentIndex + 1 : currentIndex - 1;
+    let nextIndex = direction === "next" ? currentIndex + 1 : currentIndex - 1;
     if (nextIndex < 0) nextIndex = initialPosts.length - 1;
     if (nextIndex >= initialPosts.length) nextIndex = 0;
-    
     setSelectedPost(initialPosts[nextIndex]);
   };
 
@@ -125,7 +143,7 @@ export default function StudioClient({
 
   // Polling for highly-asynchronous N8N Webhooks
   useEffect(() => {
-    const hasGeneratingPost = initialPosts.some(p => p.status === 'generating');
+    const hasGeneratingPost = initialPosts.some((p) => p.status === "generating");
     if (hasGeneratingPost) {
       const interval = setInterval(() => {
         router.refresh();
@@ -136,9 +154,9 @@ export default function StudioClient({
 
   useEffect(() => {
     if (selectedPost) {
-      const freshPost = initialPosts.find(p => p.id === selectedPost.id);
+      const freshPost = initialPosts.find((p) => p.id === selectedPost.id);
       if (freshPost && freshPost.status !== selectedPost.status) {
-         setSelectedPost(freshPost);
+        setSelectedPost(freshPost);
       }
       setEditedCaption(freshPost?.caption || selectedPost.caption || "");
     } else if (initialPosts.length > 0) {
@@ -159,6 +177,30 @@ export default function StudioClient({
         });
       }
     );
+  };
+
+  const executeSchedule = (postId: string) => {
+    startTransition(async () => {
+      const result = await autoSchedulePost(postId);
+      if (result.success) {
+        const formatted = formatScheduled(result.scheduledFor, result.timezone);
+        toast.success(`Scheduled for ${formatted}`);
+      } else if (result.error === "NO_TIMEZONE") {
+        pendingPostIdRef.current = postId;
+        setTimezoneModalOpen(true);
+      } else {
+        toast.error(result.error);
+      }
+    });
+  };
+
+  const handleSchedule = (postId: string) => {
+    if (!localTimezone) {
+      pendingPostIdRef.current = postId;
+      setTimezoneModalOpen(true);
+      return;
+    }
+    executeSchedule(postId);
   };
 
   const handleSaveCaption = async () => {
@@ -193,21 +235,22 @@ export default function StudioClient({
   };
 
   const handleTriggerClick = () => {
-    // Check if Higgsfield is present but no text-based AI provider
-    const hasHiggsfield = activeProviders.includes('higgsfield');
-    const hasTextProvider = activeProviders.some(p => p === 'google' || p === 'openai');
+    const hasHiggsfield = activeProviders.includes("higgsfield");
+    const hasTextProvider = activeProviders.some((p) => p === "google" || p === "openai");
 
     if (hasHiggsfield && !hasTextProvider) {
       openConfirm(
         "Add AI Provider",
         "Higgsfield is configured for images, but you need an AI provider (Gemini or OpenAI) for content generation. Go to Settings to add one?",
-        () => { window.location.href = "/settings"; }
+        () => {
+          window.location.href = "/settings";
+        }
       );
       return;
     }
 
     if (activeProviders.length > 1) setShowProviderSelect(true);
-    else executeTrigger(activeProviders[0] || 'auto');
+    else executeTrigger(activeProviders[0] || "auto");
   };
 
   const handleSync = async (postId: string) => {
@@ -228,7 +271,9 @@ export default function StudioClient({
         openConfirm(
           "Missing AI Key",
           "You need an active AI Provider Key to trigger generations. Go to Settings now?",
-          () => { window.location.href = "/settings"; }
+          () => {
+            window.location.href = "/settings";
+          }
         );
       } else {
         toast.error(result.error);
@@ -242,8 +287,8 @@ export default function StudioClient({
       <header className="sticky top-0 z-40 bg-background/80 backdrop-blur-xl pt-6 pb-4 px-6 lg:pt-10 lg:pb-8 lg:px-12 transition-all">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex items-center gap-4 lg:gap-8">
-            <Link 
-              href="/overview" 
+            <Link
+              href="/overview"
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-muted hover:bg-zinc-800 transition-colors group"
             >
               <ArrowLeft size={20} className="text-zinc-500 group-hover:text-white transition-colors" />
@@ -260,21 +305,23 @@ export default function StudioClient({
             </div>
           </div>
 
-          <button 
+          <button
             onClick={handleTriggerClick}
             disabled={isPending}
             className="group relative flex w-full items-center justify-center gap-3 overflow-hidden rounded-2xl bg-accent px-8 py-4 font-black uppercase tracking-widest text-accent-foreground transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 lg:w-auto lg:py-5"
           >
             <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-            {isPending ? <Loader2 className="animate-spin" /> : (
+            {isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
               <span className="relative z-10 flex items-center gap-3">
                 <Zap size={18} fill="currentColor" /> Generate Assets
               </span>
             )}
           </button>
         </div>
-        
-        {initialPosts.some(p => p.status === 'generating') && (
+
+        {initialPosts.some((p) => p.status === "generating") && (
           <div className="mt-6 flex items-center gap-3 bg-accent/5 border border-accent/10 px-4 py-2 rounded-xl w-fit animate-pulse">
             <div className="w-1.5 h-1.5 rounded-full bg-accent animate-ping" />
             <span className="text-[9px] font-black text-accent uppercase tracking-[0.2em]">Neural Pipeline Active — Streaming Updates</span>
@@ -304,16 +351,16 @@ export default function StudioClient({
                 {initialPosts.map((post) => (
                   <ContextMenu key={post.id}>
                     <ContextMenuTrigger>
-                      <div 
+                      <div
                         onClick={() => setSelectedPost(post)}
                         className={cn(
                           "group relative aspect-[4/5] overflow-hidden rounded-[2.5rem] bg-card transition-all cursor-pointer",
-                          selectedPost?.id === post.id 
-                            ? "ring-4 ring-accent ring-offset-8 ring-offset-background" 
+                          selectedPost?.id === post.id
+                            ? "ring-4 ring-accent ring-offset-8 ring-offset-background"
                             : "hover:bg-muted transition-colors"
                         )}
                       >
-                        {post.status === 'generating' ? (
+                        {post.status === "generating" ? (
                           <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-card">
                             <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center mb-6">
                               <Loader2 size={24} className="text-accent animate-spin" />
@@ -323,13 +370,13 @@ export default function StudioClient({
                           </div>
                         ) : post.videoUrl ? (
                           <div className="absolute inset-0">
-                            <video 
-                              src={post.videoUrl} 
-                              autoPlay 
-                              muted 
-                              loop 
+                            <video
+                              src={post.videoUrl}
+                              autoPlay
+                              muted
+                              loop
                               playsInline
-                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" 
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000"
                             />
                             <div className="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/40 backdrop-blur-xl flex items-center justify-center border border-white/10">
                               <Play size={14} fill="white" className="text-white ml-0.5" />
@@ -354,67 +401,85 @@ export default function StudioClient({
                             <div className="text-[10px] text-zinc-700 uppercase tracking-widest font-black">Waiting for Synthesis</div>
                           </div>
                         )}
-                        
+
                         {/* Minimal Status Overlay */}
                         <div className="absolute inset-x-0 bottom-0 p-8 bg-gradient-to-t from-background via-background/20 to-transparent">
                           <div className="flex items-center gap-3">
-                            <div className={cn(
-                              "h-2 w-2 rounded-full",
-                              post.status === 'published' ? "bg-emerald-500" : 
-                              post.status === 'generating' ? "bg-accent animate-ping" : "bg-amber-500"
-                            )} />
+                            <div
+                              className={cn(
+                                "h-2 w-2 rounded-full",
+                                post.status === "published"
+                                  ? "bg-emerald-500"
+                                  : post.status === "generating"
+                                  ? "bg-accent animate-ping"
+                                  : post.status === "pending"
+                                  ? "bg-amber-400 animate-pulse"
+                                  : "bg-amber-500"
+                              )}
+                            />
                             <span className="text-[10px] font-black text-white uppercase tracking-[0.2em]">{post.status}</span>
                           </div>
                         </div>
                       </div>
                     </ContextMenuTrigger>
-                    
+
                     <ContextMenuContent className="w-64">
                       <ContextMenuLabel>Signal Actions</ContextMenuLabel>
                       <ContextMenuItem onClick={() => setSelectedPost(post)}>
                         Select Asset
                       </ContextMenuItem>
-                      
-                      {post.status === 'published' && post.instagramPermalink && (
-                        <ContextMenuItem onClick={() => window.open(post.instagramPermalink!, '_blank')}>
+
+                      {post.status === "published" && post.instagramPermalink && (
+                        <ContextMenuItem onClick={() => window.open(post.instagramPermalink!, "_blank")}>
                           <Instagram size={14} className="mr-2" /> View Live
                         </ContextMenuItem>
                       )}
 
-                      {post.status !== 'published' && post.status !== 'generating' && (
-                        <ContextMenuItem onClick={() => handlePost(post.id)}>
-                          <Send size={14} className="mr-2" /> Approve & Post
-                        </ContextMenuItem>
+                      {post.status !== "published" && post.status !== "generating" && (
+                        <>
+                          <ContextMenuItem onClick={() => handlePost(post.id)}>
+                            <Send size={14} className="mr-2" /> Approve & Post Now
+                          </ContextMenuItem>
+                          {post.status !== "pending" && (
+                            <ContextMenuItem onClick={() => handleSchedule(post.id)}>
+                              <CalendarClock size={14} className="mr-2" /> Approve & Schedule
+                            </ContextMenuItem>
+                          )}
+                        </>
                       )}
 
-                      {post.status === 'published' && (
+                      {post.status === "published" && (
                         <ContextMenuItem onClick={() => handleSync(post.id)}>
                           <RefreshCw size={14} className="mr-2" /> Sync Metrics
                         </ContextMenuItem>
                       )}
 
-                      <ContextMenuItem onClick={() => {
-                        setSelectedPost(post);
-                        setIsEditing(true);
-                      }}>
+                      <ContextMenuItem
+                        onClick={() => {
+                          setSelectedPost(post);
+                          setIsEditing(true);
+                        }}
+                      >
                         <Edit3 size={14} className="mr-2" /> Edit Caption
                       </ContextMenuItem>
 
-                      <ContextMenuItem onClick={() => {
-                        navigator.clipboard.writeText(post.caption || "");
-                        toast.success("Caption copied to clipboard.");
-                      }}>
+                      <ContextMenuItem
+                        onClick={() => {
+                          navigator.clipboard.writeText(post.caption || "");
+                          toast.success("Caption copied to clipboard.");
+                        }}
+                      >
                         <Copy size={14} className="mr-2" /> Copy Caption
                       </ContextMenuItem>
 
                       <ContextMenuSeparator />
-                      
+
                       <ContextMenuItem onClick={() => handleRegenerate(post.id)}>
-                        <RefreshCcw size={14} className="mr-2 text-amber-500" /> 
+                        <RefreshCcw size={14} className="mr-2 text-amber-500" />
                         <span className="text-amber-500">Regenerate Asset</span>
                       </ContextMenuItem>
 
-                      <ContextMenuItem 
+                      <ContextMenuItem
                         onClick={() => handleDelete(post.id)}
                         className="text-rose-500 focus:bg-rose-500/10 focus:text-rose-500"
                       >
@@ -433,8 +498,11 @@ export default function StudioClient({
               <div className="lg:sticky lg:top-48 space-y-8">
                 <div className="bg-card rounded-[2.5rem] p-8 lg:p-10 space-y-10">
                   {/* Asset Swipe Preview */}
-                  <div className="relative aspect-square w-full overflow-hidden rounded-[2.5rem] bg-muted group cursor-pointer" onDoubleClick={() => setShowFullscreenPreview(true)}>
-                    {selectedPost.status === 'generating' ? (
+                  <div
+                    className="relative aspect-square w-full overflow-hidden rounded-[2.5rem] bg-muted group cursor-pointer"
+                    onDoubleClick={() => setShowFullscreenPreview(true)}
+                  >
+                    {selectedPost.status === "generating" ? (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center bg-zinc-900/50 backdrop-blur-sm">
                         <div className="h-16 w-16 rounded-3xl bg-accent/10 flex items-center justify-center mb-8">
                           <Loader2 size={32} className="text-accent animate-spin" />
@@ -443,14 +511,14 @@ export default function StudioClient({
                         <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Refining Signal Parameters</p>
                       </div>
                     ) : selectedPost.videoUrl ? (
-                      <video 
+                      <video
                         key={selectedPost.videoUrl}
-                        src={selectedPost.videoUrl} 
-                        autoPlay 
-                        muted 
-                        loop 
+                        src={selectedPost.videoUrl}
+                        autoPlay
+                        muted
+                        loop
                         playsInline
-                        className="h-full w-full object-cover transition-all duration-700" 
+                        className="h-full w-full object-cover transition-all duration-700"
                       />
                     ) : selectedPost.imageUrl ? (
                       <Image
@@ -465,23 +533,29 @@ export default function StudioClient({
                       />
                     ) : (
                       <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center">
-                         <Sparkles size={48} className="text-zinc-800 mb-6" />
-                         <p className="text-sm text-zinc-500 font-medium">Awaiting primary asset data...</p>
+                        <Sparkles size={48} className="text-zinc-800 mb-6" />
+                        <p className="text-sm text-zinc-500 font-medium">Awaiting primary asset data...</p>
                       </div>
                     )}
 
                     {/* Desktop Navigation Chevrons */}
                     <div className="absolute inset-y-0 left-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); navigatePost('prev'); }}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigatePost("prev");
+                        }}
                         className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-accent-foreground transition-all"
                       >
                         <ChevronLeft size={18} />
                       </button>
                     </div>
                     <div className="absolute inset-y-0 right-4 flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); navigatePost('next'); }}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigatePost("next");
+                        }}
                         className="h-10 w-10 rounded-full bg-black/60 backdrop-blur-xl border border-white/10 flex items-center justify-center text-white hover:bg-accent hover:text-accent-foreground transition-all"
                       >
                         <ChevronRight size={18} />
@@ -490,7 +564,7 @@ export default function StudioClient({
 
                     {/* Pagination Indicators */}
                     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/5">
-                      {initialPosts.map((p, i) => (
+                      {initialPosts.map((p) => (
                         <div
                           key={p.id}
                           className={cn(
@@ -510,20 +584,21 @@ export default function StudioClient({
                     </button>
                   </div>
 
+                  {/* Caption */}
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Master Caption</label>
                       <div className="flex items-center gap-3">
                         {isEditing ? (
                           <>
-                            <button 
+                            <button
                               onClick={handleSaveCaption}
                               disabled={isPending}
                               className="text-[10px] font-black text-accent uppercase tracking-widest hover:opacity-70 transition-opacity flex items-center gap-1"
                             >
                               <Check size={12} /> Save
                             </button>
-                            <button 
+                            <button
                               onClick={() => {
                                 setIsEditing(false);
                                 setEditedCaption(selectedPost.caption || "");
@@ -535,13 +610,13 @@ export default function StudioClient({
                           </>
                         ) : (
                           <>
-                            <button 
+                            <button
                               onClick={() => setIsEditing(true)}
                               className="text-[10px] font-black text-accent uppercase tracking-widest hover:opacity-70 transition-opacity flex items-center gap-1"
                             >
                               <Edit3 size={12} /> Edit
                             </button>
-                            <button 
+                            <button
                               onClick={() => {
                                 navigator.clipboard.writeText(selectedPost.caption || "");
                                 alert("Caption copied!");
@@ -554,15 +629,15 @@ export default function StudioClient({
                         )}
                       </div>
                     </div>
-                    
+
                     <div className="text-base text-zinc-300 font-medium leading-relaxed selection:bg-accent/30">
-                      {selectedPost.status === 'generating' ? (
+                      {selectedPost.status === "generating" ? (
                         <div className="space-y-2 animate-pulse">
                           <div className="h-4 bg-zinc-800 rounded w-full" />
                           <div className="h-4 bg-zinc-800 rounded w-3/4" />
                         </div>
                       ) : isEditing ? (
-                        <textarea 
+                        <textarea
                           value={editedCaption}
                           onChange={(e) => setEditedCaption(e.target.value)}
                           className="w-full bg-muted/50 border border-white/5 rounded-2xl p-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent/50 min-h-[120px] resize-none"
@@ -574,7 +649,8 @@ export default function StudioClient({
                     </div>
                   </div>
 
-                  {selectedPost.status === 'published' && (
+                  {/* Metrics (published only) */}
+                  {selectedPost.status === "published" && (
                     <div className="space-y-6 pt-6 border-t border-white/5">
                       <div className="flex items-center justify-between">
                         <h4 className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Core Metrics</h4>
@@ -599,27 +675,73 @@ export default function StudioClient({
                     </div>
                   )}
 
+                  {/* Scheduled indicator */}
+                  {selectedPost.status === "pending" && selectedPost.scheduledFor && (
+                    <div className="flex items-center gap-3 rounded-2xl bg-amber-500/10 border border-amber-500/20 px-4 py-3">
+                      <CalendarClock size={14} className="text-amber-400 shrink-0" />
+                      <span className="text-xs text-amber-300">
+                        Scheduled for{" "}
+                        {formatScheduled(selectedPost.scheduledFor, selectedPost.targetTimezone ?? null)}
+                      </span>
+                    </div>
+                  )}
+
+                  {/* Action buttons */}
                   <div className="pt-2 space-y-3">
-                    <button 
+                    {/* Approve & Post Now */}
+                    <button
                       onClick={() => handlePost(selectedPost.id)}
-                      disabled={isPending || selectedPost.status === 'published' || selectedPost.status === 'generating'}
+                      disabled={
+                        isPending ||
+                        selectedPost.status === "published" ||
+                        selectedPost.status === "generating"
+                      }
                       className={cn(
                         "w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-sm font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50",
-                        selectedPost.status === 'published' 
-                          ? "bg-emerald-500/10 text-emerald-500" 
+                        selectedPost.status === "published"
+                          ? "bg-emerald-500/10 text-emerald-500"
                           : "bg-white text-black hover:bg-accent hover:text-accent-foreground"
                       )}
                     >
-                      {isPending ? <Loader2 className="animate-spin" /> : (
+                      {isPending ? (
+                        <Loader2 className="animate-spin" />
+                      ) : (
                         <span className="flex items-center gap-3">
-                          {selectedPost.status === 'published' ? <CheckCircle2 size={18}/> : <Send size={18} />}
-                          {selectedPost.status === 'published' ? "Published" : "Approve & Post"}
+                          {selectedPost.status === "published" ? (
+                            <CheckCircle2 size={18} />
+                          ) : (
+                            <Send size={18} />
+                          )}
+                          {selectedPost.status === "published"
+                            ? "Published"
+                            : selectedPost.status === "pending"
+                            ? "Post Now Instead"
+                            : "Approve & Post Now"}
                         </span>
                       )}
                     </button>
 
-                    {selectedPost.status === 'published' && selectedPost.instagramPermalink && (
-                      <a 
+                    {/* Approve & Schedule */}
+                    {selectedPost.status !== "published" &&
+                      selectedPost.status !== "generating" && (
+                        <button
+                          onClick={() => handleSchedule(selectedPost.id)}
+                          disabled={isPending || selectedPost.status === "pending"}
+                          className={cn(
+                            "w-full flex items-center justify-center gap-3 rounded-2xl py-4 text-sm font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50",
+                            selectedPost.status === "pending"
+                              ? "border border-amber-500/30 text-amber-400"
+                              : "border border-accent/30 text-accent hover:bg-accent/10"
+                          )}
+                        >
+                          <CalendarClock size={18} />
+                          {selectedPost.status === "pending" ? "Scheduled" : "Approve & Schedule"}
+                        </button>
+                      )}
+
+                    {/* View live link */}
+                    {selectedPost.status === "published" && selectedPost.instagramPermalink && (
+                      <a
                         href={selectedPost.instagramPermalink}
                         target="_blank"
                         rel="noopener noreferrer"
@@ -650,7 +772,11 @@ export default function StudioClient({
                 <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-6">
                   <ShieldCheck size={24} className="text-zinc-700" />
                 </div>
-                <p className="text-xs text-zinc-600 font-bold uppercase tracking-widest leading-loose">Select a signal to<br/>view its composition</p>
+                <p className="text-xs text-zinc-600 font-bold uppercase tracking-widest leading-loose">
+                  Select a signal to
+                  <br />
+                  view its composition
+                </p>
               </div>
             )}
           </aside>
@@ -665,16 +791,16 @@ export default function StudioClient({
             <div className="absolute top-0 right-0 p-12 opacity-[0.02] pointer-events-none">
               <Zap size={300} fill="white" />
             </div>
-            
+
             <div className="relative z-10">
               <h2 className="text-3xl font-display font-black text-white mb-3 tracking-tighter uppercase italic">Select Engine</h2>
               <p className="text-zinc-500 text-sm font-medium mb-12 max-w-xs leading-relaxed">
                 Multiple neural pathways are active. Route this generation to your preferred core.
               </p>
-              
+
               <div className="space-y-4">
-                {activeProviders?.map(provider => (
-                  <button 
+                {activeProviders?.map((provider) => (
+                  <button
                     key={provider}
                     onClick={() => executeTrigger(provider)}
                     className="w-full flex items-center justify-between p-6 rounded-3xl bg-muted hover:bg-accent group transition-all"
@@ -686,7 +812,7 @@ export default function StudioClient({
                       <div className="text-left">
                         <div className="text-[10px] font-black text-zinc-600 uppercase tracking-[0.2em] group-hover:text-accent-foreground/60 transition-colors">Neural Core</div>
                         <div className="text-lg font-display font-black text-white uppercase tracking-tighter group-hover:text-accent-foreground transition-colors">
-                          {provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI GPT' : provider}
+                          {provider === "google" ? "Google Gemini" : provider === "openai" ? "OpenAI GPT" : provider}
                         </div>
                       </div>
                     </div>
@@ -694,8 +820,8 @@ export default function StudioClient({
                   </button>
                 ))}
               </div>
-              
-              <button 
+
+              <button
                 onClick={() => setShowProviderSelect(false)}
                 className="w-full mt-10 text-[10px] font-black text-zinc-600 uppercase tracking-[0.4em] hover:text-white transition-colors"
               >
@@ -725,9 +851,7 @@ export default function StudioClient({
             />
 
             <div>
-              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block mb-3">
-                Select Engine
-              </label>
+              <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest block mb-3">Select Engine</label>
               <div className="space-y-2">
                 {activeProviders.map((provider) => (
                   <button
@@ -742,7 +866,7 @@ export default function StudioClient({
                   >
                     <Sparkles size={14} />
                     <span className="text-sm font-semibold">
-                      {provider === 'google' ? 'Google Gemini' : provider === 'openai' ? 'OpenAI GPT' : provider}
+                      {provider === "google" ? "Google Gemini" : provider === "openai" ? "OpenAI GPT" : provider}
                     </span>
                   </button>
                 ))}
@@ -750,16 +874,15 @@ export default function StudioClient({
             </div>
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => {
-              setRefinementPrompt("");
-              setSelectedRegenerateProvider("");
-            }}>
+            <AlertDialogCancel
+              onClick={() => {
+                setRefinementPrompt("");
+                setSelectedRegenerateProvider("");
+              }}
+            >
               Cancel
             </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmRegenerate}
-              disabled={!selectedRegenerateProvider}
-            >
+            <AlertDialogAction onClick={handleConfirmRegenerate} disabled={!selectedRegenerateProvider}>
               Trigger Regeneration
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -769,21 +892,21 @@ export default function StudioClient({
       {/* Confirmation Dialog */}
       <AlertDialog
         open={confirmConfig.open}
-        onOpenChange={(open) => setConfirmConfig(prev => ({ ...prev, open }))}
+        onOpenChange={(open) => setConfirmConfig((prev) => ({ ...prev, open }))}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{confirmConfig.title}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {confirmConfig.description}
-            </AlertDialogDescription>
+            <AlertDialogDescription>{confirmConfig.description}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => {
-              confirmConfig.onConfirm();
-              setConfirmConfig(prev => ({ ...prev, open: false }));
-            }}>
+            <AlertDialogAction
+              onClick={() => {
+                confirmConfig.onConfirm();
+                setConfirmConfig((prev) => ({ ...prev, open: false }));
+              }}
+            >
               Confirm Action
             </AlertDialogAction>
           </AlertDialogFooter>
@@ -801,9 +924,8 @@ export default function StudioClient({
           </button>
 
           <div className="relative w-full h-full max-w-6xl max-h-[90vh] flex flex-col">
-            {/* Asset Display */}
             <div className="flex-1 relative overflow-hidden rounded-[2.5rem] bg-card">
-              {selectedPost.status === 'generating' ? (
+              {selectedPost.status === "generating" ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center bg-zinc-900/50 backdrop-blur-sm">
                   <div className="h-16 w-16 rounded-3xl bg-accent/10 flex items-center justify-center mb-8">
                     <Loader2 size={32} className="text-accent animate-spin" />
@@ -812,14 +934,7 @@ export default function StudioClient({
                   <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Neural Core Process</p>
                 </div>
               ) : selectedPost.videoUrl ? (
-                <video
-                  src={selectedPost.videoUrl}
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  className="w-full h-full object-contain"
-                />
+                <video src={selectedPost.videoUrl} autoPlay muted loop playsInline className="w-full h-full object-contain" />
               ) : selectedPost.imageUrl ? (
                 <Image
                   src={selectedPost.imageUrl}
@@ -838,20 +953,19 @@ export default function StudioClient({
               )}
             </div>
 
-            {/* Navigation and Info */}
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-center gap-4">
                 <button
-                  onClick={() => navigatePost('prev')}
+                  onClick={() => navigatePost("prev")}
                   className="h-12 w-12 rounded-full bg-white/10 hover:bg-accent flex items-center justify-center text-white transition-all"
                 >
                   <ChevronLeft size={20} />
                 </button>
                 <span className="text-sm text-zinc-400">
-                  {initialPosts.findIndex(p => p.id === selectedPost.id) + 1} of {initialPosts.length}
+                  {initialPosts.findIndex((p) => p.id === selectedPost.id) + 1} of {initialPosts.length}
                 </span>
                 <button
-                  onClick={() => navigatePost('next')}
+                  onClick={() => navigatePost("next")}
                   className="h-12 w-12 rounded-full bg-white/10 hover:bg-accent flex items-center justify-center text-white transition-all"
                 >
                   <ChevronRight size={20} />
@@ -860,15 +974,33 @@ export default function StudioClient({
 
               <div className="flex items-center gap-3">
                 <span className="text-sm text-zinc-400 capitalize">{selectedPost.status}</span>
-                <div className={cn(
-                  "h-2 w-2 rounded-full",
-                  selectedPost.status === 'published' ? "bg-emerald-500" :
-                  selectedPost.status === 'generating' ? "bg-accent animate-ping" : "bg-amber-500"
-                )} />
+                <div
+                  className={cn(
+                    "h-2 w-2 rounded-full",
+                    selectedPost.status === "published"
+                      ? "bg-emerald-500"
+                      : selectedPost.status === "generating"
+                      ? "bg-accent animate-ping"
+                      : "bg-amber-500"
+                  )}
+                />
               </div>
             </div>
           </div>
         </div>
+      )}
+
+      {/* Timezone Setup Modal */}
+      {timezoneModalOpen && (
+        <TimezoneSetupModal
+          onComplete={(tz) => {
+            setLocalTimezone(tz);
+            setTimezoneModalOpen(false);
+            const pid = pendingPostIdRef.current;
+            pendingPostIdRef.current = null;
+            if (pid) executeSchedule(pid);
+          }}
+        />
       )}
     </div>
   );

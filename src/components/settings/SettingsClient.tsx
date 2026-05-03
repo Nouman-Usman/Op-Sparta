@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { 
-  Key, 
+import {
+  Key,
   ArrowRight,
   Lock,
   Eye,
@@ -13,9 +13,12 @@ import {
   CheckCircle2,
   Link2,
   Shield,
+  Globe,
 } from "lucide-react";
 import { saveAiKey } from "@/app/actions/save-ai-keys";
 import { deleteAiKey, toggleAiKey, updateAiModel } from "@/app/actions/manage-ai-keys";
+import { saveUserTimezone } from "@/app/actions/schedule";
+import { TIMEZONES } from "@/components/TimezoneSetupModal";
 import { cn } from "@/lib/utils";
 
 const PROVIDERS = [
@@ -42,12 +45,14 @@ const PROVIDERS = [
   }
 ];
 
-export default function SettingsClient({ 
-  initialKeys, 
-  integrationData 
-}: { 
-  initialKeys: any[], 
-  integrationData: any 
+export default function SettingsClient({
+  initialKeys,
+  integrationData,
+  userTimezone,
+}: {
+  initialKeys: any[];
+  integrationData: any;
+  userTimezone: string | null;
 }) {
   const [selectedProvider, setSelectedProvider] = useState<"openai" | "google" | "higgsfield">("openai");
   const [apiKey, setApiKey] = useState("");
@@ -96,6 +101,19 @@ export default function SettingsClient({
   const handleModelChange = async (id: string, model: string) => {
     startTransition(async () => {
       await updateAiModel(id, model);
+    });
+  };
+
+  const [savedTimezone, setSavedTimezone] = useState(userTimezone ?? "");
+  const [tzFeedback, setTzFeedback] = useState<"saved" | null>(null);
+
+  const handleTimezoneChange = (tz: string) => {
+    setSavedTimezone(tz);
+    setTzFeedback(null);
+    startTransition(async () => {
+      await saveUserTimezone(tz);
+      setTzFeedback("saved");
+      setTimeout(() => setTzFeedback(null), 2000);
     });
   };
 
@@ -223,6 +241,39 @@ export default function SettingsClient({
                   Authenticate Instagram
                 </a>
               </div>
+            )}
+          </section>
+
+          {/* Posting Timezone */}
+          <section className="rounded-4xl bg-zinc-900/70 p-5 sm:p-6">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent/10">
+                <Globe className="text-accent" size={20} />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-white">Posting Timezone</h3>
+                <p className="text-xs text-zinc-500">Optimal slots are calculated in this timezone</p>
+              </div>
+            </div>
+
+            <select
+              value={savedTimezone}
+              onChange={(e) => handleTimezoneChange(e.target.value)}
+              disabled={isPending}
+              className="w-full appearance-none bg-black/30 border border-white/5 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-accent/40 disabled:opacity-50 mb-2"
+            >
+              <option value="" disabled className="bg-zinc-900">Select timezone…</option>
+              {TIMEZONES.map((tz) => (
+                <option key={tz.value} value={tz.value} className="bg-zinc-900">
+                  {tz.label}
+                </option>
+              ))}
+            </select>
+
+            {tzFeedback === "saved" && (
+              <p className="text-xs text-emerald-400 flex items-center gap-1.5">
+                <CheckCircle2 size={12} /> Timezone saved
+              </p>
             )}
           </section>
 
