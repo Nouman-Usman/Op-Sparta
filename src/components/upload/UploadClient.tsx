@@ -16,6 +16,7 @@ import { createClient } from "@/utils/supabase/client";
 import { analyzeImageAndGenerate } from "@/app/actions/analyze-image";
 import { autoSchedulePost } from "@/app/actions/schedule";
 import { TimezoneSetupModal } from "@/components/TimezoneSetupModal";
+import { toast } from "sonner";
 
 // Compress and resize an image to a JPEG ≤ 5 MB so it always meets Instagram's
 // 8 MB limit. Resizes to 1080px max width (Instagram's recommended resolution).
@@ -98,25 +99,35 @@ export function UploadClient({
     const supported = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
     if (!supported.includes(file.type)) {
       const ext = file.name.split(".").pop()?.toUpperCase() ?? file.type;
-      setUploadError(`${ext} files aren't supported. Please upload a JPEG or PNG image.`);
+      const msg = `${ext} files aren't supported. Please upload a JPEG, PNG, or WEBP image.`;
+      setUploadError(msg);
+      toast.error("Unsupported file type", { description: msg });
       return;
     }
 
     // Dimension + aspect-ratio check (requires loading the image)
-    const dimCheck = await new Promise<{ ok: boolean; error?: string }>((res) => {
+    const dimCheck = await new Promise<{ ok: boolean; title?: string; description?: string }>((res) => {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
         URL.revokeObjectURL(url);
         const { width, height } = img;
         if (width < 320 || height < 320) {
-          res({ ok: false, error: `Image too small (${width}×${height}px). Instagram requires at least 320×320px.` });
+          res({
+            ok: false,
+            title: "Image too small",
+            description: `${width}×${height}px — Instagram requires at least 320×320px.`,
+          });
           return;
         }
         const ratio = width / height;
         if (ratio < 0.8 - 0.01 || ratio > 1.91 + 0.01) {
-          const dir = ratio < 0.8 ? "portrait is too tall" : "landscape is too wide";
-          res({ ok: false, error: `Aspect ratio ${dir} (${ratio.toFixed(2)}:1). Instagram accepts 4:5 portrait to 1.91:1 landscape.` });
+          const dir = ratio < 0.8 ? "Portrait is too tall" : "Landscape is too wide";
+          res({
+            ok: false,
+            title: "Invalid aspect ratio",
+            description: `${dir} (${ratio.toFixed(2)}:1). Instagram accepts 4:5 portrait to 1.91:1 landscape.`,
+          });
           return;
         }
         res({ ok: true });
@@ -126,7 +137,9 @@ export function UploadClient({
     });
 
     if (!dimCheck.ok) {
-      setUploadError(dimCheck.error!);
+      const msg = dimCheck.description!;
+      setUploadError(msg);
+      toast.error(dimCheck.title!, { description: msg });
       return;
     }
 
@@ -193,8 +206,11 @@ export function UploadClient({
         setScheduledFor(scheduleResult.scheduledFor);
         setScheduledTimezone(scheduleResult.timezone);
         setStep("done");
+        toast.success("Post scheduled!", { description: "Your image has been analyzed and auto-scheduled." });
       } catch (err: unknown) {
-        setUploadError(err instanceof Error ? err.message : "Processing failed. Please try again.");
+        const msg = err instanceof Error ? err.message : "Processing failed. Please try again.";
+        setUploadError(msg);
+        toast.error("Upload failed", { description: msg });
       }
     });
   };
@@ -266,30 +282,43 @@ export function UploadClient({
             </h2>
 
             {!preview ? (
-              <div
-                onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-                onDragLeave={() => setIsDragging(false)}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-                className={cn(
-                  "border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all",
-                  isDragging
-                    ? "border-accent bg-accent/10"
-                    : "border-border hover:border-accent/50 hover:bg-muted/30"
-                )}
-              >
-                <Upload size={32} className="text-muted-foreground" />
-                <div className="text-center">
-                  <p className="text-sm font-medium text-foreground">Drop image here or click to browse</p>
-                  <p className="text-xs text-muted-foreground mt-1">PNG, JPG, WEBP — max 10 MB</p>
+              <div className="space-y-3">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                  onDragLeave={() => setIsDragging(false)}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={cn(
+                    "border-2 border-dashed rounded-xl p-12 flex flex-col items-center justify-center gap-3 cursor-pointer transition-all",
+                    isDragging
+                      ? "border-accent bg-accent/10"
+                      : uploadError
+                      ? "border-red-500/50 bg-red-500/5"
+                      : "border-border hover:border-accent/50 hover:bg-muted/30"
+                  )}
+                >
+                  {uploadError
+                    ? <AlertTriangle size={32} className="text-red-400" />
+                    : <Upload size={32} className="text-muted-foreground" />
+                  }
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-foreground">Drop image here or click to browse</p>
+                    <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WEBP · min 320×320px · aspect ratio 4:5 to 1.91:1</p>
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/jpg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => { if (e.target.files?.[0]) void handleFileSelect(e.target.files[0]); }}
+                  />
                 </div>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={(e) => { if (e.target.files?.[0]) void handleFileSelect(e.target.files[0]); }}
-                />
+                {uploadError && (
+                  <div className="flex items-start gap-2 text-red-400 text-xs bg-red-500/10 rounded-lg px-3 py-2.5">
+                    <AlertTriangle size={13} className="mt-0.5 shrink-0" />
+                    <span>{uploadError}</span>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-4">

@@ -1,21 +1,23 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect, useCallback } from "react";
 import Image from "next/image";
-import { 
-  Search, 
-  Grid3X3, 
-  List, 
-  Play, 
-  Image as ImageIcon, 
-  MoreVertical,
+import {
+  Search,
+  Grid3X3,
+  List,
+  Play,
+  Image as ImageIcon,
   Download,
   Trash2,
-  ExternalLink,
+  Expand,
   Sparkles,
   Upload,
   Package,
-  Loader2
+  Loader2,
+  X,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { Asset, deleteAsset } from "@/app/actions/assets";
 import { cn } from "@/lib/utils";
@@ -31,12 +33,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface AssetsClientProps {
   initialAssets: Asset[];
@@ -49,6 +45,7 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
   const [isPending, startTransition] = useTransition();
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   const filteredAssets = initialAssets.filter((asset) => {
     const matchesFilter = 
@@ -64,6 +61,24 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
 
     return matchesFilter && matchesSearch;
   });
+
+  const openLightbox = useCallback((index: number) => setLightboxIndex(index), []);
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  const lightboxPrev = useCallback(() =>
+    setLightboxIndex((i) => (i !== null ? (i - 1 + filteredAssets.length) % filteredAssets.length : null)), [filteredAssets.length]);
+  const lightboxNext = useCallback(() =>
+    setLightboxIndex((i) => (i !== null ? (i + 1) % filteredAssets.length : null)), [filteredAssets.length]);
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeLightbox();
+      if (e.key === "ArrowLeft") lightboxPrev();
+      if (e.key === "ArrowRight") lightboxNext();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [lightboxIndex, closeLightbox, lightboxPrev, lightboxNext]);
 
   const getSourceIcon = (source: string) => {
     switch (source) {
@@ -188,6 +203,7 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
                 "group relative bg-card border border-white/5 rounded-2xl overflow-hidden hover:border-accent/50 transition-all duration-300",
                 view === "list" && "flex items-center p-3 gap-4"
               )}
+              onDoubleClick={() => openLightbox(index)}
             >
               {/* Media Preview */}
               <div className={cn(
@@ -226,68 +242,33 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
                 "flex-1 flex flex-col min-w-0",
                 view === "grid" ? "p-3" : "justify-center"
               )}>
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[10px] text-zinc-500 font-medium mb-0.5">
-                      {format(asset.createdAt, 'MMM d, yyyy')}
-                    </p>
-                    <p className="text-sm font-bold text-white truncate">
-                      {asset.metadata?.caption || asset.metadata?.projectName || "Untitled Asset"}
-                    </p>
-                  </div>
-                  
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button className="text-zinc-500 hover:text-white transition-colors shrink-0">
-                        <MoreVertical size={16} />
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-zinc-300">
-                      <DropdownMenuItem 
-                        onClick={() => window.open(asset.url, '_blank')}
-                        className="hover:bg-white/5 cursor-pointer"
-                      >
-                        <ExternalLink size={14} className="mr-2" /> View Original
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => handleDownload(asset.url, `asset-${asset.id}.${asset.type === 'video' ? 'mp4' : 'jpg'}`)}
-                        className="hover:bg-white/5 cursor-pointer"
-                      >
-                        <Download size={14} className="mr-2" /> Download
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        onClick={() => {
-                          setAssetToDelete(asset);
-                          setDeleteConfirmOpen(true);
-                        }}
-                        className="hover:bg-red-500/10 text-red-400 cursor-pointer focus:text-red-400 focus:bg-red-500/10"
-                      >
-                        <Trash2 size={14} className="mr-2" /> Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                <div className="flex flex-col min-w-0">
+                  <p className="text-[10px] text-zinc-500 font-medium mb-0.5">
+                    {format(asset.createdAt, 'MMM d, yyyy')}
+                  </p>
+                  <p className="text-sm font-bold text-white truncate">
+                    {asset.metadata?.caption || asset.metadata?.projectName || "Untitled Asset"}
+                  </p>
                 </div>
 
                 {/* Grid Hover Actions */}
                 {view === "grid" && (
                   <div className="absolute inset-0 bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                    <a 
-                      href={asset.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
+                    <button
+                      onClick={() => openLightbox(index)}
                       className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-accent transition-colors"
-                      title="View Original"
+                      title="View"
                     >
-                      <ExternalLink size={18} />
-                    </a>
-                    <button 
+                      <Expand size={18} />
+                    </button>
+                    <button
                       onClick={() => handleDownload(asset.url, `asset-${asset.id}.${asset.type === 'video' ? 'mp4' : 'jpg'}`)}
                       className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-accent transition-colors"
                       title="Download"
                     >
                       <Download size={18} />
                     </button>
-                    <button 
+                    <button
                       onClick={() => {
                         setAssetToDelete(asset);
                         setDeleteConfirmOpen(true);
@@ -296,6 +277,33 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
                       title="Delete"
                     >
                       <Trash2 size={18} />
+                    </button>
+                  </div>
+                )}
+
+                {/* List row actions */}
+                {view === "list" && (
+                  <div className="flex items-center gap-2 shrink-0 ml-auto">
+                    <button
+                      onClick={() => openLightbox(index)}
+                      className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
+                      title="View"
+                    >
+                      <Expand size={15} />
+                    </button>
+                    <button
+                      onClick={() => handleDownload(asset.url, `asset-${asset.id}.${asset.type === 'video' ? 'mp4' : 'jpg'}`)}
+                      className="p-2 rounded-lg text-zinc-500 hover:text-white hover:bg-white/5 transition-colors"
+                      title="Download"
+                    >
+                      <Download size={15} />
+                    </button>
+                    <button
+                      onClick={() => { setAssetToDelete(asset); setDeleteConfirmOpen(true); }}
+                      className="p-2 rounded-lg text-zinc-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 )}
@@ -314,6 +322,97 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
           </p>
         </div>
       )}
+
+      {/* Lightbox */}
+      {lightboxIndex !== null && (() => {
+        const asset = filteredAssets[lightboxIndex];
+        return (
+          <div
+            className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col"
+            onClick={closeLightbox}
+          >
+            {/* Top bar */}
+            <div
+              className="flex items-center justify-between px-5 py-4 shrink-0"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-xs font-bold text-zinc-400 uppercase tracking-widest">
+                  {lightboxIndex + 1} / {filteredAssets.length}
+                </span>
+                <span className="text-sm font-semibold text-white truncate max-w-xs">
+                  {asset.metadata?.caption || asset.metadata?.projectName || "Untitled Asset"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleDownload(asset.url, `asset-${asset.id}.${asset.type === 'video' ? 'mp4' : 'jpg'}`)}
+                  className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Download"
+                >
+                  <Download size={18} />
+                </button>
+                <button
+                  onClick={closeLightbox}
+                  className="p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors"
+                  title="Close"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* Media */}
+            <div className="flex-1 flex items-center justify-center px-16 min-h-0" onClick={(e) => e.stopPropagation()}>
+              {asset.type === 'video' ? (
+                <video
+                  src={asset.url}
+                  controls
+                  autoPlay
+                  className="max-h-full max-w-full rounded-xl object-contain"
+                />
+              ) : (
+                <div className="relative w-full h-full">
+                  <Image
+                    src={asset.url}
+                    alt={asset.metadata?.caption ?? "Asset"}
+                    fill
+                    className="object-contain"
+                    sizes="100vw"
+                    priority
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* Nav arrows */}
+            {filteredAssets.length > 1 && (
+              <>
+                <button
+                  onClick={(e) => { e.stopPropagation(); lightboxPrev(); }}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                >
+                  <ChevronLeft size={22} />
+                </button>
+                <button
+                  onClick={(e) => { e.stopPropagation(); lightboxNext(); }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-3 rounded-full bg-white/10 text-white hover:bg-white/20 transition-colors"
+                >
+                  <ChevronRight size={22} />
+                </button>
+              </>
+            )}
+
+            {/* Bottom meta */}
+            <div className="shrink-0 px-5 py-4 flex items-center gap-3" onClick={(e) => e.stopPropagation()}>
+              <span className="text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded-lg bg-white/10 text-zinc-300">
+                {asset.source}
+              </span>
+              <span className="text-xs text-zinc-500">{format(asset.createdAt, 'MMM d, yyyy')}</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Delete Confirmation */}
       <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>

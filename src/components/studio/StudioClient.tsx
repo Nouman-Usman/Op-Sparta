@@ -5,13 +5,11 @@ import { useRouter } from "next/navigation";
 import {
   Instagram,
   CheckCircle2,
-  Clock,
   Zap,
   Sparkles,
   ArrowLeft,
   Loader2,
   Trash2,
-  ExternalLink,
   ChevronRight,
   ChevronLeft,
   ShieldCheck,
@@ -23,7 +21,6 @@ import {
   MessageCircle,
   Eye,
   RefreshCcw,
-  MoreVertical,
   Copy,
   Edit3,
   Check,
@@ -86,7 +83,7 @@ export default function StudioClient({
   const [showProviderSelect, setShowProviderSelect] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [selectedPost, setSelectedPost] = useState<any>(initialPosts[0] || null);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isCaptionModalOpen, setIsCaptionModalOpen] = useState(false);
   const [editedCaption, setEditedCaption] = useState("");
   const [isRefining, setIsRefining] = useState(false);
   const [refinementPrompt, setRefinementPrompt] = useState("");
@@ -208,7 +205,6 @@ export default function StudioClient({
     startTransition(async () => {
       const result = await updatePostCaption(selectedPost.id, editedCaption);
       if (result.success) {
-        setIsEditing(false);
         toast.success("Caption updated.");
       } else {
         toast.error(result.error);
@@ -457,7 +453,7 @@ export default function StudioClient({
                       <ContextMenuItem
                         onClick={() => {
                           setSelectedPost(post);
-                          setIsEditing(true);
+                          setIsCaptionModalOpen(true);
                         }}
                       >
                         <Edit3 size={14} className="mr-2" /> Edit Caption
@@ -588,64 +584,31 @@ export default function StudioClient({
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <label className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Master Caption</label>
-                      <div className="flex items-center gap-3">
-                        {isEditing ? (
-                          <>
-                            <button
-                              onClick={handleSaveCaption}
-                              disabled={isPending}
-                              className="text-[10px] font-black text-accent uppercase tracking-widest hover:opacity-70 transition-opacity flex items-center gap-1"
-                            >
-                              <Check size={12} /> Save
-                            </button>
-                            <button
-                              onClick={() => {
-                                setIsEditing(false);
-                                setEditedCaption(selectedPost.caption || "");
-                              }}
-                              className="text-[10px] font-black text-rose-500 uppercase tracking-widest hover:opacity-70 transition-opacity flex items-center gap-1"
-                            >
-                              <X size={12} /> Cancel
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <button
-                              onClick={() => setIsEditing(true)}
-                              className="text-[10px] font-black text-accent uppercase tracking-widest hover:opacity-70 transition-opacity flex items-center gap-1"
-                            >
-                              <Edit3 size={12} /> Edit
-                            </button>
-                            <button
-                              onClick={() => {
-                                navigator.clipboard.writeText(selectedPost.caption || "");
-                                alert("Caption copied!");
-                              }}
-                              className="text-[10px] font-black text-zinc-500 uppercase tracking-widest hover:opacity-70 transition-opacity"
-                            >
-                              Copy
-                            </button>
-                          </>
-                        )}
-                      </div>
+                      <button
+                        onClick={() => setIsCaptionModalOpen(true)}
+                        className="text-[10px] font-black text-accent uppercase tracking-widest hover:opacity-70 transition-opacity flex items-center gap-1.5"
+                      >
+                        <Maximize2 size={12} /> Expand Editor
+                      </button>
                     </div>
 
-                    <div className="text-base text-zinc-300 font-medium leading-relaxed selection:bg-accent/30">
-                      {selectedPost.status === "generating" ? (
-                        <div className="space-y-2 animate-pulse">
-                          <div className="h-4 bg-zinc-800 rounded w-full" />
-                          <div className="h-4 bg-zinc-800 rounded w-3/4" />
-                        </div>
-                      ) : isEditing ? (
-                        <textarea
-                          value={editedCaption}
-                          onChange={(e) => setEditedCaption(e.target.value)}
-                          className="w-full bg-muted/50 border border-white/5 rounded-2xl p-4 text-sm text-white focus:outline-none focus:ring-1 focus:ring-accent/50 min-h-[120px] resize-none"
-                          placeholder="Refine your narrative..."
-                        />
-                      ) : (
-                        <p className="italic">&quot;{selectedPost.caption}&quot;</p>
-                      )}
+                    <div 
+                      onClick={() => setIsCaptionModalOpen(true)}
+                      className="group relative cursor-pointer bg-muted/30 border border-white/5 rounded-2xl p-6 hover:bg-muted/50 transition-all"
+                    >
+                      <div className="text-sm text-zinc-400 font-medium leading-relaxed line-clamp-4 italic group-hover:text-zinc-200 transition-colors">
+                        {selectedPost.status === "generating" ? (
+                          <div className="space-y-2 animate-pulse">
+                            <div className="h-4 bg-zinc-800 rounded w-full" />
+                            <div className="h-4 bg-zinc-800 rounded w-3/4" />
+                          </div>
+                        ) : (
+                          <>&quot;{selectedPost.caption}&quot;</>
+                        )}
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-background/20 backdrop-blur-sm rounded-2xl">
+                        <span className="text-[10px] font-black text-white uppercase tracking-widest">Open Narrative Editor</span>
+                      </div>
                     </div>
                   </div>
 
@@ -985,6 +948,97 @@ export default function StudioClient({
                   )}
                 />
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Caption Editor Modal */}
+      {isCaptionModalOpen && selectedPost && (
+        <div className="fixed inset-0 z-[160] flex items-center justify-center p-6 lg:p-12">
+          <div className="absolute inset-0 bg-background/90 backdrop-blur-3xl" onClick={() => setIsCaptionModalOpen(false)} />
+          <div className="relative bg-card border border-white/5 rounded-[3rem] w-full max-w-2xl p-10 lg:p-12 shadow-2xl animate-in zoom-in-95 duration-500 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-4">
+                <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center">
+                  <Edit3 size={24} className="text-accent" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-display font-black text-white tracking-tighter uppercase italic">Narrative Core</h2>
+                  <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black mt-1">Signal Refinement & Review</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsCaptionModalOpen(false)}
+                className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-zinc-500 hover:text-white transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-6 scrollbar-hide">
+              <textarea
+                value={editedCaption}
+                onChange={(e) => setEditedCaption(e.target.value)}
+                className="w-full bg-muted/30 border border-white/5 rounded-3xl p-8 text-lg text-zinc-200 font-medium leading-relaxed focus:outline-none focus:ring-2 focus:ring-accent/20 min-h-[300px] transition-all resize-none selection:bg-accent/30"
+                placeholder="Craft your story..."
+                autoFocus
+              />
+              
+              <div className="flex items-center justify-between px-4">
+                 <div className="flex gap-8">
+                   <div className="flex flex-col">
+                     <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Characters</span>
+                     <span className={cn("text-sm font-bold", editedCaption.length > 2200 ? "text-rose-500" : "text-white")}>
+                       {editedCaption.length} <span className="text-zinc-600">/ 2200</span>
+                     </span>
+                   </div>
+                   <div className="flex flex-col">
+                     <span className="text-[10px] font-black text-zinc-600 uppercase tracking-widest">Words</span>
+                     <span className="text-sm font-bold text-white">
+                       {editedCaption.trim() ? editedCaption.trim().split(/\s+/).length : 0}
+                     </span>
+                   </div>
+                 </div>
+                 
+                 <button 
+                   onClick={() => {
+                      navigator.clipboard.writeText(editedCaption);
+                      toast.success("Caption copied!");
+                   }}
+                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-muted text-[10px] font-black uppercase tracking-widest text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all group"
+                 >
+                   <Copy size={14} className="group-hover:scale-110 transition-transform" /> Copy Signal
+                 </button>
+              </div>
+            </div>
+
+            <div className="mt-10 flex gap-4">
+              <button
+                onClick={() => {
+                  setIsCaptionModalOpen(false);
+                  setEditedCaption(selectedPost.caption || "");
+                }}
+                className="flex-1 py-5 rounded-2xl border border-white/5 text-[10px] font-black uppercase tracking-widest text-zinc-500 hover:bg-white/5 transition-all"
+              >
+                Discard Changes
+              </button>
+              <button
+                onClick={async () => {
+                   await handleSaveCaption();
+                   setIsCaptionModalOpen(false);
+                }}
+                disabled={isPending}
+                className="flex-[2] py-5 rounded-2xl bg-white text-black text-[10px] font-black uppercase tracking-widest hover:bg-accent hover:text-accent-foreground transition-all flex items-center justify-center gap-3 active:scale-[0.98] disabled:opacity-50"
+              >
+                {isPending ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <>
+                    <Check size={18} /> Update Narrative
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>

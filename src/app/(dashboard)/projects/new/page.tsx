@@ -1,16 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { 
-  ArrowLeft, 
-  Plus,
+import {
+  ArrowLeft,
   Loader2,
   CheckCircle2,
   Sparkles,
   Zap,
-  Globe,
-  MessageSquare,
-  Users,
   Palette,
   ArrowRight
 } from "lucide-react";
@@ -20,32 +16,18 @@ import { createProject } from "@/app/actions/projects";
 import { cn } from "@/lib/utils";
 import { createClient } from "@/utils/supabase/client";
 
-const STEPS = [
-  { id: "brand", name: "Product Info", icon: Globe, description: "Your product details" },
-  { id: "context", name: "Strategy", icon: TargetIcon, description: "Audience & Tone" },
-  { id: "visual", name: "Visuals", icon: Palette, description: "Colors & Style" },
-];
-
-function TargetIcon(props: any) {
-  return (
-    <svg {...props} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
-  );
-}
 
 export default function NewProjectPage() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState({
     name: "",
     productDesc: "",
     brandColor: "#000000",
     brandVoice: "aggressive",
-    productImage: "", // Will hold the pasted URL if in URL mode
   });
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [localPreview, setLocalPreview] = useState<string | null>(null);
-  const [imageInputMode, setImageInputMode] = useState<"upload" | "url">("upload");
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -59,10 +41,10 @@ export default function NewProjectPage() {
     if (!formData.name) return;
 
     startTransition(async () => {
-      let finalImageUrl = formData.productImage;
+      let finalImageUrl = "";
 
-      // Wait until submission to upload the file to Supabase if in upload mode
-      if (imageInputMode === "upload" && selectedFile) {
+      // Wait until submission to upload the file to Supabase
+      if (selectedFile) {
         try {
           const supabase = createClient();
           const fileExt = selectedFile.name.split('.').pop();
@@ -94,6 +76,7 @@ export default function NewProjectPage() {
         brandVoice: formData.brandVoice,
         productImage: finalImageUrl,
       });
+
 
       if (result.success) {
         router.push(`/studio?projectId=${result.projectId}`);
@@ -181,73 +164,40 @@ export default function NewProjectPage() {
                   />
               </div>
 
-              {/* Product Image Toggle Block */}
-              <div className="space-y-0">
-                <div className="flex items-center justify-between ml-1 mb-2">
-                  <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Product Image</label>
-                  <div className="flex bg-black/40 rounded-lg p-1 border border-white/5">
-                    <button 
-                      type="button" 
-                      onClick={() => setImageInputMode("upload")}
-                      className={cn("text-[10px] px-3 py-1.5 rounded-md uppercase font-bold tracking-wider transition-all", imageInputMode === "upload" ? "bg-white/10 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-300")}
-                    >Upload</button>
-                    <button 
-                      type="button" 
-                      onClick={() => setImageInputMode("url")}
-                      className={cn("text-[10px] px-3 py-1.5 rounded-md uppercase font-bold tracking-wider transition-all", imageInputMode === "url" ? "bg-white/10 text-white shadow-sm" : "text-zinc-600 hover:text-zinc-300")}
-                    >Link URL</button>
+              {/* Product Image */}
+              <div className="space-y-2">
+                <label className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest ml-1">Product Image</label>
+                <div className="group relative overflow-hidden rounded-3xl border-2 border-dashed border-white/10 p-6 text-center transition-all hover:border-white/20 hover:bg-white/5 sm:rounded-4xl sm:p-8">
+                  {isPending ? (
+                    <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                      <Loader2 className="animate-spin text-accent mb-2" size={32} />
+                      <p className="text-xs font-bold text-white uppercase tracking-widest">Uploading & Creating...</p>
+                    </div>
+                  ) : localPreview ? (
+                    <div className="absolute inset-0 bg-black z-0">
+                      <img src={localPreview} alt="Selected product preview" className="w-full h-full object-cover opacity-60" />
+                      <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-white font-bold text-sm bg-black/50 px-4 py-2 rounded-xl backdrop-blur-md">Click to Replace</p>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageSelect}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                    title="Upload Product Image"
+                  />
+
+                  <div className={cn("relative z-10 pointer-events-none transition-opacity", localPreview ? "opacity-0" : "opacity-100")}>
+                    <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                      <Palette className="text-zinc-400 group-hover:text-accent transition-colors" size={24} />
+                    </div>
+                    <h4 className="text-white font-bold mb-1">Upload Product Image</h4>
+                    <p className="text-xs text-zinc-500">Drag and drop or click to browse</p>
                   </div>
                 </div>
-
-                {imageInputMode === "upload" ? (
-                  <div className="group relative overflow-hidden rounded-3xl border-2 border-dashed border-white/10 p-6 text-center transition-all hover:border-white/20 hover:bg-white/5 sm:rounded-4xl sm:p-8">
-                    
-                    {isPending ? (
-                      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center z-10">
-                        <Loader2 className="animate-spin text-accent mb-2" size={32} />
-                        <p className="text-xs font-bold text-white uppercase tracking-widest">Uploading & Creating...</p>
-                      </div>
-                    ) : localPreview ? (
-                      <div className="absolute inset-0 bg-black z-0">
-                        <img src={localPreview} alt="Selected product preview" className="w-full h-full object-cover opacity-60" />
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity">
-                           <p className="text-white font-bold text-sm bg-black/50 px-4 py-2 rounded-xl backdrop-blur-md">Click to Replace</p>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    <input 
-                      type="file" 
-                      accept="image/*"
-                      onChange={handleImageSelect}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                      title="Upload Product Image"
-                    />
-
-                    <div className={cn("relative z-10 pointer-events-none transition-opacity", localPreview ? "opacity-0" : "opacity-100")}>
-                      <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
-                        <Palette className="text-zinc-400 group-hover:text-accent transition-colors" size={24} />
-                      </div>
-                      <h4 className="text-white font-bold mb-1">Upload Product Image</h4>
-                      <p className="text-xs text-zinc-500">Drag and drop or click to browse</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="bg-black/20 border border-white/5 rounded-3xl p-6">
-                    <input 
-                      type="url" 
-                      placeholder="e.g. https://example.com/image.png"
-                      className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 px-6 text-white focus:outline-none focus:ring-2 focus:ring-accent transition-all mb-4"
-                      value={formData.productImage}
-                      onChange={(e) => setFormData({ ...formData, productImage: e.target.value })}
-                    />
-                    {formData.productImage && (
-                      <div className="w-full aspect-video rounded-xl border border-white/10 overflow-hidden relative bg-black/50">
-                        <img src={formData.productImage} alt="Preview" className="w-full h-full object-contain" />
-                      </div>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
 
