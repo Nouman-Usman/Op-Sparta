@@ -64,8 +64,8 @@ export default function LoginPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${getURL()}auth/callback`,
-          data: {
+          emailRedirectTo: process.env.NEXT_PUBLIC_SITE_URL+ "/auth/callback",
+          data: { 
             full_name: username.trim(),
             username: username.trim().toLowerCase().replace(/\s+/g, '_'),
           },
