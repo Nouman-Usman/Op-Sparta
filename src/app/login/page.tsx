@@ -5,7 +5,6 @@ import { createClient } from "@/utils/supabase/client";
 import { useRouter } from "next/navigation";
 import { Zap, Loader2, Mail, Lock, ArrowRight, AlertCircle, User, CheckCircle } from "lucide-react";
 import Link from "next/link";
-import { getURL } from "@/lib/utils";
 
 export default function LoginPage() {
   const [isLogin, setIsLogin] = useState(true);
