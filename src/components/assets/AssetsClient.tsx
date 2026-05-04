@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import Image from "next/image";
 import { 
   Search, 
@@ -14,11 +14,29 @@ import {
   ExternalLink,
   Sparkles,
   Upload,
-  Package
+  Package,
+  Loader2
 } from "lucide-react";
-import { Asset } from "@/app/actions/assets";
+import { Asset, deleteAsset } from "@/app/actions/assets";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AssetsClientProps {
   initialAssets: Asset[];
@@ -28,14 +46,16 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
   const [view, setView] = useState<"grid" | "list">("grid");
   const [filter, setFilter] = useState<string>("all");
   const [search, setSearch] = useState("");
+  const [isPending, startTransition] = useTransition();
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
 
   const filteredAssets = initialAssets.filter((asset) => {
     const matchesFilter = 
       filter === "all" || 
       (filter === "post" && asset.source === "post") ||
       (filter === "upload" && asset.source === "upload") ||
-      (filter === "project" && asset.source === "project") 
-      // (filter === "video" && asset.type === "video");
+      (filter === "project" && asset.source === "project");
     
     const matchesSearch = 
       search === "" || 
@@ -52,6 +72,42 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
       case 'project': return <Package size={12} className="text-orange-400" />;
       default: return null;
     }
+  };
+
+  const handleDownload = async (url: string, filename: string) => {
+    try {
+      toast.loading("Preparing download...", { id: "download" });
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+      toast.success("Download started", { id: "download" });
+    } catch (error) {
+      console.error("Download failed", error);
+      toast.error("Download failed. Opening in new tab...", { id: "download" });
+      window.open(url, '_blank');
+    }
+  };
+
+  const handleDelete = () => {
+    if (!assetToDelete) return;
+    
+    startTransition(async () => {
+      const result = await deleteAsset(assetToDelete.id, assetToDelete.source, assetToDelete.url);
+      if (result.success) {
+        toast.success("Asset deleted successfully");
+      } else {
+        toast.error(result.error || "Failed to delete asset");
+      }
+      setAssetToDelete(null);
+      setDeleteConfirmOpen(false);
+    });
   };
 
   return (
@@ -127,7 +183,7 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
         )}>
           {filteredAssets.map((asset) => (
             <div
-              key={asset.id}
+              key={`${asset.id}-${asset.source}`}
               className={cn(
                 "group relative bg-card border border-white/5 rounded-2xl overflow-hidden hover:border-accent/50 transition-all duration-300",
                 view === "list" && "flex items-center p-3 gap-4"
@@ -165,7 +221,7 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
 
               {/* Info & Actions */}
               <div className={cn(
-                "flex-1 flex flex-col",
+                "flex-1 flex flex-col min-w-0",
                 view === "grid" ? "p-3" : "justify-center"
               )}>
                 <div className="flex items-start justify-between gap-2">
@@ -177,9 +233,37 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
                       {asset.metadata?.caption || asset.metadata?.projectName || "Untitled Asset"}
                     </p>
                   </div>
-                  <button className="text-zinc-500 hover:text-white transition-colors">
-                    <MoreVertical size={16} />
-                  </button>
+                  
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button className="text-zinc-500 hover:text-white transition-colors shrink-0">
+                        <MoreVertical size={16} />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-zinc-300">
+                      <DropdownMenuItem 
+                        onClick={() => window.open(asset.url, '_blank')}
+                        className="hover:bg-white/5 cursor-pointer"
+                      >
+                        <ExternalLink size={14} className="mr-2" /> View Original
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => handleDownload(asset.url, `asset-${asset.id}.${asset.type === 'video' ? 'mp4' : 'jpg'}`)}
+                        className="hover:bg-white/5 cursor-pointer"
+                      >
+                        <Download size={14} className="mr-2" /> Download
+                      </DropdownMenuItem>
+                      <DropdownMenuItem 
+                        onClick={() => {
+                          setAssetToDelete(asset);
+                          setDeleteConfirmOpen(true);
+                        }}
+                        className="hover:bg-red-500/10 text-red-400 cursor-pointer focus:text-red-400 focus:bg-red-500/10"
+                      >
+                        <Trash2 size={14} className="mr-2" /> Delete
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
 
                 {/* Grid Hover Actions */}
@@ -190,13 +274,25 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
                       target="_blank" 
                       rel="noopener noreferrer"
                       className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-accent transition-colors"
+                      title="View Original"
                     >
                       <ExternalLink size={18} />
                     </a>
-                    <button className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-accent transition-colors">
+                    <button 
+                      onClick={() => handleDownload(asset.url, `asset-${asset.id}.${asset.type === 'video' ? 'mp4' : 'jpg'}`)}
+                      className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-accent transition-colors"
+                      title="Download"
+                    >
                       <Download size={18} />
                     </button>
-                    <button className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-red-500 transition-colors">
+                    <button 
+                      onClick={() => {
+                        setAssetToDelete(asset);
+                        setDeleteConfirmOpen(true);
+                      }}
+                      className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-red-500 transition-colors"
+                      title="Delete"
+                    >
                       <Trash2 size={18} />
                     </button>
                   </div>
@@ -216,6 +312,44 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
           </p>
         </div>
       )}
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+        <AlertDialogContent className="bg-zinc-900 border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Delete Asset?</AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              This action cannot be undone. This will permanently delete the asset from your library and storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel 
+              className="bg-zinc-800 border-white/5 text-zinc-300 hover:bg-zinc-700 hover:text-white"
+              disabled={isPending}
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                handleDelete();
+              }}
+              className="bg-red-500 text-white hover:bg-red-600 font-bold"
+              disabled={isPending}
+            >
+              {isPending ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
+

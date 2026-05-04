@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { posts, projects } from "@/db/schema";
 import { eq, and, or, isNotNull, desc } from "drizzle-orm";
 import { createClient } from "@/utils/supabase/server";
+import { revalidatePath } from "next/cache";
 
 export type Asset = {
   id: string;
@@ -86,3 +87,47 @@ export async function getAssets(): Promise<Asset[]> {
     (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
   );
 }
+
+export async function deleteAsset(assetId: string, source: Asset['source'], url: string) {
+  const supabase = await createClient();
+  if (!supabase) throw new Error("Supabase client not initialized");
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  try {
+    // 1. Delete from Storage if it's a Supabase URL
+    if (url.includes(".supabase.co/storage/v1/object/public/")) {
+      const path = url.split("/project-assets/")[1];
+      if (path) {
+        await supabase.storage.from("project-assets").remove([path]);
+      }
+    }
+
+    // 2. Delete from Database
+    if (source === 'post' || source === 'upload') {
+      await db.delete(posts).where(
+        and(
+          eq(posts.id, assetId),
+          eq(posts.userId, user.id)
+        )
+      );
+    } else if (source === 'project') {
+      await db.update(projects)
+        .set({ productImage: null })
+        .where(
+          and(
+            eq(projects.id, assetId),
+            eq(projects.userId, user.id)
+          )
+        );
+    }
+
+    revalidatePath("/assets");
+    return { success: true };
+  } catch (error) {
+    console.error("Error deleting asset:", error);
+    return { success: false, error: "Failed to delete asset" };
+  }
+}
+
