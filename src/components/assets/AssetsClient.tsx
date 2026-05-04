@@ -181,7 +181,7 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
             ? "grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4" 
             : "flex flex-col gap-2"
         )}>
-          {filteredAssets.map((asset) => (
+          {filteredAssets.map((asset, index) => (
             <div
               key={`${asset.id}-${asset.source}`}
               className={cn(
@@ -206,6 +206,8 @@ export function AssetsClient({ initialAssets }: AssetsClientProps) {
                     src={asset.url}
                     alt="Asset"
                     fill
+                    sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                    priority={index < 10}
                     className="object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                 )}
