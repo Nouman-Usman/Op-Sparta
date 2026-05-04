@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export async function GET(request: Request) {
   const { origin } = new URL(request.url);
   const appId = process.env.INSTAGRAM_APP_ID;
-  const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || `${origin}/api/auth/instagram/callback`;
+  const redirectUri = `${origin}/api/auth/instagram/callback`;
   const configId = process.env.INSTAGRAM_CONFIG_ID;
   
   if (!appId || !configId) {

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { posts, users } from "@/db/schema";
-import { eq, and, lte, isNotNull } from "drizzle-orm";
+import { eq, and, lte, isNotNull, or } from "drizzle-orm";
 import { InstagramService } from "@/lib/social/instagram";
 
 // Vercel cron jobs invoke routes with GET
@@ -18,7 +18,7 @@ export async function GET(req: Request) {
     .from(posts)
     .where(
       and(
-        eq(posts.status, "pending"),
+        or(eq(posts.status, "pending"), eq(posts.status, "ready")),
         isNotNull(posts.scheduledFor),
         lte(posts.scheduledFor, now)
       )

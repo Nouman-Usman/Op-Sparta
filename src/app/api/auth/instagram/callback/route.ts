@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   try {
     const appId = process.env.INSTAGRAM_APP_ID;
     const appSecret = process.env.INSTAGRAM_APP_SECRET;
-    const redirectUri = process.env.INSTAGRAM_REDIRECT_URI || `${origin}/api/auth/instagram/callback`;
+    const redirectUri = `${origin}/api/auth/instagram/callback`;
 
     // 1. Exchange code for short-lived token
     const tokenResponse = await fetch(
