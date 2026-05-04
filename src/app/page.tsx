@@ -79,11 +79,6 @@ export default function LandingPage() {
           </div>
           <span className="text-xl font-bold tracking-tight">Sparta</span>
         </div>
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
-          <a href="#features" className="hover:text-white transition-colors">Features</a>
-          <a href="#how-it-works" className="hover:text-white transition-colors">How it Works</a>
-          <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
-        </div>
         <Link 
           href="/overview" 
           className="rounded-full bg-white px-4 py-2 text-xs font-bold text-black transition-all hover:scale-105 sm:px-6 sm:text-sm"
