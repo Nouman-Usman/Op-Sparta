@@ -49,7 +49,15 @@ export async function generateSocialContent(
   const apiKey = decrypt(aiKey.encryptedKey, aiKey.iv);
 
   // 3. Initialize the model using the user's provider and preferred model
-  const modelId = aiKey.config?.defaultModel || (aiKey.provider === 'openai' ? 'gpt-4o' : 'gemini-1.5-pro-latest');
+  let modelId = aiKey.config?.defaultModel || (aiKey.provider === 'openai' ? 'gpt-4o' : 'gemini-3.1-pro-preview');
+  
+  // Patch old model IDs from DB to prevent errors
+  if (modelId === 'gemini-1.5-pro' || modelId === 'gemini-1.5-pro-latest' || modelId === 'gemini-2.0-pro-exp') {
+    modelId = 'gemini-3.1-pro-preview';
+  } else if (modelId === 'gemini-1.5-flash' || modelId === 'gemini-1.5-flash-latest' || modelId === 'gemini-2.0-flash') {
+    modelId = 'gemini-3.1-flash-preview';
+  }
+
   const model = getModel(aiKey.provider as any, modelId as any, apiKey);
 
   const result = await generateObject({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useTransition } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -15,9 +15,14 @@ import {
   Tag,
   Loader2,
   RefreshCw,
+  Send,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { approveAndPost } from "@/app/actions/publish";
+import { deletePost } from "@/app/actions/projects";
+import { toast } from "sonner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -190,8 +195,39 @@ function DayCell({
   );
 }
 
-function PostDrawer({ post, onClose }: { post: Post; onClose: () => void }) {
+function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => void; onRefresh: () => void }) {
   const isInstagram = !!post.instagramPostId || post.source === "upload";
+  const [isPending, startTransition] = useTransition();
+
+  const handlePostNow = () => {
+    if (!confirm("Are you sure you want to publish this to Instagram immediately?")) return;
+    
+    startTransition(async () => {
+      const result = await approveAndPost(post.id);
+      if (result.success) {
+        toast.success("Post published successfully!");
+        onRefresh();
+        onClose();
+      } else {
+        toast.error("Failed to publish", { description: result.error });
+      }
+    });
+  };
+
+  const handleDiscard = () => {
+    if (!confirm("Are you sure you want to discard this post? This action cannot be undone.")) return;
+
+    startTransition(async () => {
+      const result = await deletePost(post.id);
+      if (result.success) {
+        toast.success("Post discarded.");
+        onRefresh();
+        onClose();
+      } else {
+        toast.error("Failed to discard post", { description: result.error });
+      }
+    });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -283,6 +319,28 @@ function PostDrawer({ post, onClose }: { post: Post; onClose: () => void }) {
             </a>
           )}
         </div>
+
+        {/* Actions Footer */}
+        {post.status !== "published" && (
+          <div className="p-5 border-t border-border bg-muted/20 space-y-3">
+            <button
+              onClick={handlePostNow}
+              disabled={isPending}
+              className="w-full py-3 rounded-xl bg-accent text-accent-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-accent/20 transition-all active:scale-[0.98] disabled:opacity-50"
+            >
+              {isPending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
+              Post Now
+            </button>
+            <button
+              onClick={handleDiscard}
+              disabled={isPending}
+              className="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-bold text-sm flex items-center justify-center gap-2 transition-all active:scale-[0.98] hover:bg-red-500/20 disabled:opacity-50"
+            >
+              {isPending ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+              Discard Post
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -529,7 +587,11 @@ export function PlannerClient() {
 
       {/* Post detail drawer */}
       {selectedPost && (
-        <PostDrawer post={selectedPost} onClose={() => setSelectedPost(null)} />
+        <PostDrawer 
+          post={selectedPost} 
+          onClose={() => setSelectedPost(null)} 
+          onRefresh={() => fetchPosts(view, anchor)}
+        />
       )}
     </>
   );

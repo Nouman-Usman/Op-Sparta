@@ -264,6 +264,29 @@ export async function regeneratePost(postId: string, projectId: string, refineme
   }
 }
 
+export async function updatePost(postId: string, data: { caption?: string; hashtags?: string[] }) {
+  try {
+    const supabase = await createClient();
+    if (!supabase) throw new Error("Unauthorized");
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw new Error("Unauthorized");
+
+    const updateData: any = {};
+    if (data.caption !== undefined) updateData.caption = data.caption;
+    if (data.hashtags !== undefined) updateData.hashtags = data.hashtags;
+
+    await db.update(posts)
+      .set(updateData)
+      .where(and(eq(posts.id, postId), eq(posts.userId, user.id)));
+
+    revalidatePath("/studio");
+    revalidatePath("/upload");
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 export async function updatePostCaption(postId: string, newCaption: string) {
   try {
     const supabase = await createClient();

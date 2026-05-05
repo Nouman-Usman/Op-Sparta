@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache";
 const ImageCaptionSchema = z.object({
   hook: z.string().describe("Opening line (first 125 chars) — must grab attention before the 'more' cutoff."),
   caption: z.string().describe("Full caption: hook + body. Hashtags placed at END. 150-300 chars total."),
-  hashtags: z.array(z.string()).length(3).describe("Exactly 3 highly relevant hashtags without the # symbol. Quality over quantity per Instagram 2024 algorithm guidelines."),
+  hashtags: z.array(z.string()).describe("Highly relevant hashtags without the # symbol."),
   commentKeywords: z.array(z.string()).max(5).describe("Keywords to post in first comment for SEO — must match the hook/caption topic cluster exactly."),
   altText: z.string().describe("Accessible image description, 1-2 sentences."),
   suggestedPlatform: z.enum(["Instagram", "LinkedIn", "TikTok", "Twitter"]),
@@ -21,7 +21,11 @@ const ImageCaptionSchema = z.object({
 
 export type ImageCaption = z.infer<typeof ImageCaptionSchema>;
 
-export async function analyzeImageAndGenerate(imageUrl: string): Promise<
+export async function analyzeImageAndGenerate(
+  imageUrl: string,
+  tone: string = "viral",
+  hashtagCount: number = 3
+): Promise<
   { success: true; postId: string; analysis: ImageCaption } |
   { success: false; error: string }
 > {
@@ -54,8 +58,11 @@ export async function analyzeImageAndGenerate(imageUrl: string): Promise<
             type: "text",
             text: `You are an expert Instagram growth strategist. Analyze this image and generate viral-ready content.
 
+TONE: Use a ${tone} tone.
+HASHTAGS: Provide exactly ${hashtagCount} hashtags.
+
 CRITICAL Instagram 2024 rules you MUST follow:
-- Use EXACTLY 3 hashtags, placed at the very end of the caption
+- Place hashtags at the very end of the caption
 - The hook, caption body, hashtags, and comment keywords MUST share the same topic cluster for SEO alignment
 - Hook must be the first sentence — make it stop-the-scroll worthy
 - Sound human and relatable, never corporate
