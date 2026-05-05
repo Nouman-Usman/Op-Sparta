@@ -17,7 +17,7 @@ import {
 import Link from "next/link";
 import { db } from "@/db";
 import { projects as projectsTable, posts } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { getGlobalMetrics } from "@/app/actions/analytics";
 import { cn } from "@/lib/utils";
 
@@ -32,7 +32,8 @@ export default async function OverviewPage() {
   const userProjects = await db
     .select()
     .from(projectsTable)
-    .where(eq(projectsTable.userId, user.id));
+    .where(eq(projectsTable.userId, user.id))
+    .orderBy(desc(projectsTable.createdAt));
 
   // Pre-fetch generation status for all projects; keep UI alive even if individual queries fail.
   const projectsWithStatus = await Promise.all(userProjects.map(async (project) => {
