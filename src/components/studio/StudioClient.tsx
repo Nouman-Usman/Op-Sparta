@@ -27,6 +27,7 @@ import {
   X,
   Maximize2,
   CalendarClock,
+  AlertTriangle,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -364,6 +365,16 @@ export default function StudioClient({
                             <div className="text-lg font-display font-bold text-white mb-1.5 uppercase tracking-tighter italic">Synthesizing...</div>
                             <div className="text-[10px] text-zinc-600 uppercase tracking-widest font-black">Neural Core Process</div>
                           </div>
+                        ) : post.status === "failed" ? (
+                          <div className="absolute inset-0 flex flex-col items-center justify-center p-8 text-center bg-card border border-red-500/20">
+                            <div className="h-12 w-12 rounded-2xl bg-red-500/10 flex items-center justify-center mb-6">
+                              <AlertTriangle size={24} className="text-red-400" />
+                            </div>
+                            <div className="text-sm font-display font-bold text-red-400 mb-1.5 uppercase tracking-tighter italic">Generation Failed</div>
+                            {post.errorMessage && (
+                              <div className="text-[10px] text-red-500/70 font-medium leading-relaxed line-clamp-3">{post.errorMessage}</div>
+                            )}
+                          </div>
                         ) : post.videoUrl ? (
                           <div className="absolute inset-0">
                             <video
@@ -408,6 +419,8 @@ export default function StudioClient({
                                   ? "bg-emerald-500"
                                   : post.status === "generating"
                                   ? "bg-accent animate-ping"
+                                  : post.status === "failed"
+                                  ? "bg-red-500"
                                   : post.status === "pending"
                                   ? "bg-amber-400 animate-pulse"
                                   : "bg-amber-500"
@@ -505,6 +518,16 @@ export default function StudioClient({
                         </div>
                         <h3 className="text-2xl font-display font-bold text-white mb-2 uppercase tracking-tighter italic">Neural Synthesis</h3>
                         <p className="text-[10px] text-zinc-500 uppercase tracking-[0.3em] font-black">Refining Signal Parameters</p>
+                      </div>
+                    ) : selectedPost.status === "failed" ? (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center p-12 text-center bg-red-950/30 backdrop-blur-sm border border-red-500/20 rounded-[2.5rem]">
+                        <div className="h-16 w-16 rounded-3xl bg-red-500/10 flex items-center justify-center mb-8">
+                          <AlertTriangle size={32} className="text-red-400" />
+                        </div>
+                        <h3 className="text-xl font-display font-bold text-red-400 mb-3 uppercase tracking-tighter italic">Generation Failed</h3>
+                        {selectedPost.errorMessage && (
+                          <p className="text-xs text-red-400/70 leading-relaxed max-w-xs">{selectedPost.errorMessage}</p>
+                        )}
                       </div>
                     ) : selectedPost.videoUrl ? (
                       <video

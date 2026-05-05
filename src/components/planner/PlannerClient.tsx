@@ -157,8 +157,8 @@ function DayCell({
   date: Date; dayPosts: Post[]; isCurrentMonth: boolean; isToday: boolean;
   view: ViewMode; onPostClick: (p: Post) => void;
 }) {
-  const maxVisible = view === "week" ? 8 : 2;
-  const overflow = dayPosts.length - maxVisible;
+  const maxVisible = view === "week" ? 8 : dayPosts.length;
+  const overflow = 0;
 
   return (
     <div className={cn(

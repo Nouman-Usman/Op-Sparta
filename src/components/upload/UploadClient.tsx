@@ -137,12 +137,13 @@ export function UploadClient({
           return;
         }
         const ratio = width / height;
-        if (ratio < 0.8 - 0.01 || ratio > 1.91 + 0.01) {
-          const dir = ratio < 0.8 ? "Portrait is too tall" : "Landscape is too wide";
+        // Instagram 2026: 3:4 (0.75) portrait → 1.91:1 landscape, plus 1:1 and 9:16
+        if (ratio < 0.75 - 0.01 || ratio > 1.91 + 0.01) {
+          const dir = ratio < 0.75 ? "Portrait is too tall" : "Landscape is too wide";
           res({
             ok: false,
             title: "Invalid aspect ratio",
-            description: `${dir} (${ratio.toFixed(2)}:1). Instagram accepts 4:5 portrait to 1.91:1 landscape.`,
+            description: `${dir} (${ratio.toFixed(2)}:1). Instagram accepts 3:4, 4:5, 1:1, or up to 1.91:1 landscape.`,
           });
           return;
         }
@@ -363,7 +364,7 @@ export function UploadClient({
                     }
                     <div className="text-center">
                       <p className="text-sm font-medium text-foreground">Drop image here or click to browse</p>
-                      <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WEBP · aspect ratio 4:5 to 1.91:1</p>
+                      <p className="text-xs text-muted-foreground mt-1">JPEG, PNG, WEBP · 3:4, 4:5, 1:1, or up to 1.91:1</p>
                     </div>
                     <input
                       ref={fileInputRef}
