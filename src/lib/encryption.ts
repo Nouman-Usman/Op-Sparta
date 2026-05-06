@@ -13,6 +13,7 @@ export function encrypt(text: string) {
   let encrypted = cipher.update(text);
   encrypted = Buffer.concat([encrypted, cipher.final()]);
   return {
+    
     iv: iv.toString("hex"),
     encryptedData: encrypted.toString("hex"),
   };

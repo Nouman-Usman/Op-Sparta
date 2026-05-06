@@ -32,9 +32,9 @@ const PROVIDERS = [
   {
     id: "google",
     name: "Google Gemini",
-    description: "Harness Gemini 3.1's massive context and multimodal capabilities.",
+    description: "Harness Gemini 3.0's massive context and next-gen reasoning.",
     url: "https://aistudio.google.com/app/apikey",
-    models: ["gemini-3.1-pro-preview", "gemini-3.1-flash-preview"],
+    models: ["gemini-3-pro-preview", "gemini-3-flash-preview"],
   },
   {
     id: "higgsfield",

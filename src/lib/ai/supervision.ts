@@ -49,13 +49,16 @@ export async function generateSocialContent(
   const apiKey = decrypt(aiKey.encryptedKey, aiKey.iv);
 
   // 3. Initialize the model using the user's provider and preferred model
-  let modelId = aiKey.config?.defaultModel || (aiKey.provider === 'openai' ? 'gpt-4o' : 'gemini-3.1-pro-preview');
+  let modelId = aiKey.config?.defaultModel || (aiKey.provider === 'openai' ? 'gpt-4o' : 'gemini-3-pro-preview');
   
-  // Patch old model IDs from DB to prevent errors
-  if (modelId === 'gemini-1.5-pro' || modelId === 'gemini-1.5-pro-latest' || modelId === 'gemini-2.0-pro-exp') {
-    modelId = 'gemini-3.1-pro-preview';
-  } else if (modelId === 'gemini-1.5-flash' || modelId === 'gemini-1.5-flash-latest' || modelId === 'gemini-2.0-flash') {
-    modelId = 'gemini-3.1-flash-preview';
+  // Patch old model IDs from DB to prevent errors and capacity issues
+  const isOldPro = ['gemini-1.5-pro', 'gemini-1.5-pro-latest', 'gemini-2.0-pro-exp', 'gemini-2.5-pro', 'gemini-3.1-pro-preview'].includes(modelId);
+  const isOldFlash = ['gemini-1.5-flash', 'gemini-1.5-flash-latest', 'gemini-2.0-flash', 'gemini-2.5-flash', 'gemini-3.1-flash-preview'].includes(modelId);
+
+  if (isOldPro) {
+    modelId = 'gemini-3-pro-preview';
+  } else if (isOldFlash) {
+    modelId = 'gemini-3-flash-preview';
   }
 
   const model = getModel(aiKey.provider as any, modelId as any, apiKey);

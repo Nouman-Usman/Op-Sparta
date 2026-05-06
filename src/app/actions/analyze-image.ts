@@ -29,63 +29,76 @@ export async function analyzeImageAndGenerate(
   { success: true; postId: string; analysis: ImageCaption } |
   { success: false; error: string }
 > {
-  const supabase = await createClient();
-  if (!supabase) return { success: false, error: "Auth failed" };
+  try {
+    const supabase = await createClient();
+    if (!supabase) return { success: false, error: "Auth failed" };
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return { success: false, error: "Unauthorized" };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Unauthorized" };
 
-  const [aiKey] = await db
-    .select()
-    .from(aiKeys)
-    .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true)))
-    .limit(1);
+    const [aiKey] = await db
+      .select()
+      .from(aiKeys)
+      .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true)))
+      .limit(1);
 
-  if (!aiKey) return { success: false, error: "No active AI API key. Add one in Settings." };
+    if (!aiKey) return { success: false, error: "No active AI API key. Add one in Settings." };
 
-  const apiKey = decrypt(aiKey.encryptedKey, aiKey.iv);
-  const model = getVisionModel(aiKey.provider as any, apiKey);
+    const apiKey = decrypt(aiKey.encryptedKey, aiKey.iv);
+    const model = getVisionModel(aiKey.provider as any, apiKey);
 
-  const result = await generateObject({
-    model,
-    schema: ImageCaptionSchema,
-    messages: [
-      {
-        role: "user",
-        content: [
-          { type: "image", image: new URL(imageUrl) },
-          {
-            type: "text",
-            text: `You are an expert Instagram growth strategist. Analyze this image and generate viral-ready content.
+    // Fetch the image as a buffer to pass directly to the AI model.
+    // This bypasses potential public access issues with the URL.
+    const imageRes = await fetch(imageUrl);
+    if (!imageRes.ok) {
+      throw new Error(`Failed to fetch image for analysis: ${imageRes.statusText}`);
+    }
+    const imageBuffer = await imageRes.arrayBuffer();
+
+    const result = await generateObject({
+      model,
+      schema: ImageCaptionSchema,
+      messages: [
+        {
+          role: "user",
+          content: [
+            { type: "image", image: imageBuffer },
+            {
+              type: "text",
+              text: `You are an expert Instagram growth strategist. Analyze this image and generate viral-ready content.
 
 TONE: Use a ${tone} tone.
 HASHTAGS: Provide exactly ${hashtagCount} hashtags.
 
-CRITICAL Instagram 2024 rules you MUST follow:
+CRITICAL Instagram 2026 rules you MUST follow:
 - Place hashtags at the very end of the caption
 - The hook, caption body, hashtags, and comment keywords MUST share the same topic cluster for SEO alignment
 - Hook must be the first sentence — make it stop-the-scroll worthy
 - Sound human and relatable, never corporate
 
 Generate the caption, hashtags, comment keywords, and alt text now.`,
-          },
-        ],
-      },
-    ],
-  });
+            },
+          ],
+        },
+      ],
+    });
 
-  const [newPost] = await db.insert(posts).values({
-    userId: user.id,
-    projectId: null,
-    source: "upload",
-    imageUrl,
-    caption: result.object.caption,
-    hashtags: result.object.hashtags,
-    status: "ready",
-  }).returning({ id: posts.id });
+    const [newPost] = await db.insert(posts).values({
+      userId: user.id,
+      projectId: null,
+      source: "upload",
+      imageUrl,
+      caption: result.object.caption,
+      hashtags: result.object.hashtags,
+      status: "ready",
+    }).returning({ id: posts.id });
 
-  revalidatePath("/upload");
-  return { success: true, postId: newPost.id, analysis: result.object };
+    revalidatePath("/upload");
+    return { success: true, postId: newPost.id, analysis: result.object };
+  } catch (error: any) {
+    console.error("Analysis Error:", error);
+    return { success: false, error: error.message || "Failed to analyze image" };
+  }
 }
 
 export async function scheduleUploadPost(

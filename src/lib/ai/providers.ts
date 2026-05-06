@@ -25,14 +25,14 @@ export function getModel(provider: Provider, type: ModelType, apiKey: string) {
   if (provider === "google") {
     const google = createGoogleGenerativeAI({ apiKey });
     
-    let primary = "gemini-3.1-pro-preview";
+    let primary = "gemini-3-pro-preview";
 
-    if (type === "flash" || type === "gemini-3.1-flash-preview" || type === "gemini-2.0-flash" || type === "gemini-1.5-flash" || type === "gemini-1.5-flash-latest") {
-      return google("gemini-3.1-flash-preview");
+    if (type === "flash" || type === "gemini-3-flash-preview" || type === "gemini-3.1-flash-preview" || type === "gemini-2.5-flash" || type === "gemini-2.0-flash") {
+      return google("gemini-3-flash-preview");
     }
 
-    if (type === "pro" || type === "gemini-2.0-pro-exp" || type === "gemini-1.5-pro" || type === "gemini-1.5-pro-latest") {
-      primary = "gemini-3.1-pro-preview";
+    if (type === "pro" || type === "gemini-3-pro-preview" || type === "gemini-3.1-pro-preview" || type === "gemini-2.5-pro" || type === "gemini-2.0-pro-exp") {
+      primary = "gemini-3-pro-preview";
     } else if (type !== "quality") {
       primary = type;
     }
@@ -50,8 +50,8 @@ export function getVisionModel(provider: Provider, apiKey: string) {
   }
   if (provider === "google") {
     const google = createGoogleGenerativeAI({ apiKey });
-    // Use 3.1 Pro Preview as primary for vision
-    return google("gemini-3.1-pro-preview");
+    // Use 3.0 Flash Preview as primary for vision (requested by user)
+    return google("gemini-3-flash-preview");
   }
   throw new Error(`Provider ${provider} not supported for vision`);
 }
