@@ -4,11 +4,34 @@ import { posts } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
+/**
+ * Sanitize an error string coming from n8n.
+ * n8n sometimes forwards raw HTTP response bodies (HTML 400/500 pages).
+ * This strips HTML, extracts a useful status line, and caps length.
+ */
+function sanitizeError(raw: string): string {
+  const s = String(raw).trim();
+
+  // Detect HTML pages (e.g. Google/Cloudflare error pages)
+  if (/^<!doctype|^<html/i.test(s)) {
+    // Try to pull the <title> text as a short summary
+    const titleMatch = s.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) return `Upstream error: ${titleMatch[1].trim()}`;
+    return "Upstream service returned an HTML error page.";
+  }
+
+  // Strip any residual HTML tags from mixed content
+  const stripped = s.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim();
+
+  // Truncate to 300 chars so the UI card doesn't overflow
+  return stripped.length > 300 ? stripped.slice(0, 297) + "…" : stripped;
+}
+
 // Called by n8n when a generation workflow fails.
 // Expected payload:
 //   { postId?: string, projectId?: string, error: string, stage?: string }
 //
-// postId   — preferred; directly targets the failing post.
+// postId    — preferred; directly targets the failing post.
 // projectId — fallback; smart-matches the latest 'generating' post for the project.
 // error     — human-readable error message shown in the Studio UI.
 // stage     — optional label of the n8n node/stage that failed (e.g. "image_synthesis").
@@ -24,7 +47,8 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`📥 [N8N Error Webhook] Error received — stage: ${stage ?? "unknown"} | error: ${error}`);
+    const cleanError = sanitizeError(error);
+    console.log(`📥 [N8N Error Webhook] stage: ${stage ?? "unknown"} | raw: ${String(error).slice(0, 120)} | clean: ${cleanError}`);
 
     let targetPostId = postId;
 
@@ -52,9 +76,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Mark the post as failed; store the error message in supervisionScore
-    // (reused as an available text column — no migration needed).
-    const errorPayload = stage ? `[${stage}] ${error}` : error;
+    const errorPayload = stage ? `[${stage}] ${cleanError}` : cleanError;
 
     const result = await db
       .update(posts)

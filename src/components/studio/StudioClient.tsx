@@ -57,6 +57,17 @@ import {
 } from "@/components/ui/alert-dialog";
 import { TimezoneSetupModal } from "@/components/TimezoneSetupModal";
 
+function cleanErrorMessage(raw: string | null | undefined): string {
+  if (!raw) return "An upstream error occurred. Please retry generation.";
+  const s = raw.trim();
+  if (/^<!doctype|^<html/i.test(s) || (s.includes("<") && s.includes("</") && s.includes(">"))) {
+    const titleMatch = s.match(/<title[^>]*>([^<]+)<\/title>/i);
+    if (titleMatch) return `Upstream error: ${titleMatch[1].trim()}`;
+    return "Upstream service returned an error. Please retry generation.";
+  }
+  return s.replace(/<[^>]+>/g, " ").replace(/\s{2,}/g, " ").trim() || "An error occurred. Please retry.";
+}
+
 function formatScheduled(isoOrDate: string | Date, timezone: string | null): string {
   const d = typeof isoOrDate === "string" ? new Date(isoOrDate) : isoOrDate;
   return d.toLocaleString("en-US", {
@@ -371,9 +382,9 @@ export default function StudioClient({
                               <AlertTriangle size={24} className="text-red-400" />
                             </div>
                             <div className="text-sm font-display font-bold text-red-400 mb-1.5 uppercase tracking-tighter italic">Generation Failed</div>
-                            {post.errorMessage && (
-                              <div className="text-[10px] text-red-500/70 font-medium leading-relaxed line-clamp-3">{post.errorMessage}</div>
-                            )}
+                            <div className="text-[10px] text-red-500/70 font-medium leading-relaxed line-clamp-3">
+                                {cleanErrorMessage(post.errorMessage)}
+                            </div>
                           </div>
                         ) : post.videoUrl ? (
                           <div className="absolute inset-0">
@@ -444,7 +455,7 @@ export default function StudioClient({
                         </ContextMenuItem>
                       )}
 
-                      {post.status !== "published" && post.status !== "generating" && (
+                      {post.status !== "published" && post.status !== "generating" && post.status !== "failed" && (
                         <>
                           <ContextMenuItem onClick={() => handlePost(post.id)}>
                             <Send size={14} className="mr-2" /> Approve & Post Now
@@ -525,9 +536,9 @@ export default function StudioClient({
                           <AlertTriangle size={32} className="text-red-400" />
                         </div>
                         <h3 className="text-xl font-display font-bold text-red-400 mb-3 uppercase tracking-tighter italic">Generation Failed</h3>
-                        {selectedPost.errorMessage && (
-                          <p className="text-xs text-red-400/70 leading-relaxed max-w-xs">{selectedPost.errorMessage}</p>
-                        )}
+                        <p className="text-xs text-red-400/70 leading-relaxed max-w-xs">
+                          {cleanErrorMessage(selectedPost.errorMessage)}
+                        </p>
                       </div>
                     ) : selectedPost.videoUrl ? (
                       <video
@@ -674,42 +685,45 @@ export default function StudioClient({
 
                   {/* Action buttons */}
                   <div className="pt-2 space-y-3">
-                    {/* Approve & Post Now */}
-                    <button
-                      onClick={() => handlePost(selectedPost.id)}
-                      disabled={
-                        isPending ||
-                        selectedPost.status === "published" ||
-                        selectedPost.status === "generating"
-                      }
-                      className={cn(
-                        "w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-sm font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50",
-                        selectedPost.status === "published"
-                          ? "bg-emerald-500/10 text-emerald-500"
-                          : "bg-white text-black hover:bg-accent hover:text-accent-foreground"
-                      )}
-                    >
-                      {isPending ? (
-                        <Loader2 className="animate-spin" />
-                      ) : (
-                        <span className="flex items-center gap-3">
-                          {selectedPost.status === "published" ? (
-                            <CheckCircle2 size={18} />
-                          ) : (
-                            <Send size={18} />
-                          )}
-                          {selectedPost.status === "published"
-                            ? "Published"
-                            : selectedPost.status === "pending"
-                            ? "Post Now Instead"
-                            : "Approve & Post Now"}
-                        </span>
-                      )}
-                    </button>
+                    {/* Approve & Post Now — hidden for failed posts */}
+                    {selectedPost.status !== "failed" && (
+                      <button
+                        onClick={() => handlePost(selectedPost.id)}
+                        disabled={
+                          isPending ||
+                          selectedPost.status === "published" ||
+                          selectedPost.status === "generating"
+                        }
+                        className={cn(
+                          "w-full flex items-center justify-center gap-3 rounded-2xl py-5 text-sm font-black uppercase tracking-widest transition-all active:scale-[0.98] disabled:opacity-50",
+                          selectedPost.status === "published"
+                            ? "bg-emerald-500/10 text-emerald-500"
+                            : "bg-white text-black hover:bg-accent hover:text-accent-foreground"
+                        )}
+                      >
+                        {isPending ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <span className="flex items-center gap-3">
+                            {selectedPost.status === "published" ? (
+                              <CheckCircle2 size={18} />
+                            ) : (
+                              <Send size={18} />
+                            )}
+                            {selectedPost.status === "published"
+                              ? "Published"
+                              : selectedPost.status === "pending"
+                              ? "Post Now Instead"
+                              : "Approve & Post Now"}
+                          </span>
+                        )}
+                      </button>
+                    )}
 
-                    {/* Approve & Schedule */}
+                    {/* Approve & Schedule — hidden for failed posts */}
                     {selectedPost.status !== "published" &&
-                      selectedPost.status !== "generating" && (
+                      selectedPost.status !== "generating" &&
+                      selectedPost.status !== "failed" && (
                         <button
                           onClick={() => handleSchedule(selectedPost.id)}
                           disabled={isPending || selectedPost.status === "pending"}
