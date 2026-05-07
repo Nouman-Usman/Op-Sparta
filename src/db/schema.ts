@@ -11,6 +11,10 @@ export const users = pgTable('users', {
   instagramAccessToken: text('instagram_access_token'),
   instagramPageId: text('instagram_page_id'),
   timezone: text('timezone'),
+  scheduleSlots: jsonb('schedule_slots').$type<{
+    days: number[]; // 0-6 (Sun-Sat)
+    times: { hour: number; minute: number }[]; // 24h format
+  }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

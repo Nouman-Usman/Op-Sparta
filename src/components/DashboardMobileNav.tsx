@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { motion } from "framer-motion";
 import { Home, Sparkles, Settings, PlusCircle, Zap, Images } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +29,7 @@ export function DashboardMobileNav() {
 
           <Link
             href="/projects/new"
+            prefetch={true}
             className="inline-flex items-center gap-1.5 rounded-xl bg-accent px-3 py-2 text-xs font-bold text-accent-foreground"
           >
             <PlusCircle size={14} />
@@ -36,21 +38,32 @@ export function DashboardMobileNav() {
         </div>
       </header>
 
-      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/95 backdrop-blur">
-        <div className="grid grid-cols-4 px-1 py-1.5">
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-50 border-t border-border bg-background/95 backdrop-blur pb-safe">
+        <div className="grid grid-cols-4 px-1 py-1.5 gap-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(`${item.href}/`);
             return (
               <Link
                 key={item.name}
                 href={item.href}
+                prefetch={true}
                 className={cn(
-                  "flex flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[10px] font-semibold",
-                  isActive ? "text-accent bg-accent/10" : "text-muted-foreground"
+                  "relative flex flex-col items-center justify-center gap-1 rounded-xl px-2 py-2.5 text-[10px] font-semibold transition-colors",
+                  isActive ? "text-accent" : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                <item.icon size={14} />
-                <span className="text-[9px]">{item.name}</span>
+                {isActive && (
+                  <motion.div
+                    layoutId="mobile-active-tab"
+                    className="absolute inset-0 bg-accent/10 rounded-xl border border-accent/20"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                  />
+                )}
+                <item.icon size={18} className="relative z-10" />
+                <span className="relative z-10 text-[9px]">{item.name}</span>
               </Link>
             );
           })}

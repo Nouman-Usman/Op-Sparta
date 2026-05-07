@@ -21,6 +21,7 @@ export default async function SettingsPage() {
     instagramUsername?: string | null;
     instagramProfilePic?: string | null;
     timezone?: string | null;
+    scheduleSlots?: { days: number[]; times: { hour: number; minute: number }[] } | null;
   } | undefined;
 
   // Keep settings page available even if DB schema or connection is temporarily unhealthy.
@@ -36,6 +37,7 @@ export default async function SettingsPage() {
           instagramAccessToken: users.instagramAccessToken,
           instagramPageId: users.instagramPageId,
           timezone: users.timezone,
+          scheduleSlots: users.scheduleSlots,
         })
         .from(users)
         .where(eq(users.id, user.id))
@@ -43,7 +45,7 @@ export default async function SettingsPage() {
     ]);
 
     userKeys = keysResult;
-    rawIntegrationData = integrationResult[0];
+    rawIntegrationData = integrationResult[0] as any;
   } catch (error) {
     console.error("SettingsPage: failed to load DB settings data", error);
   }
@@ -70,26 +72,30 @@ export default async function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6 px-4 py-5 animate-in fade-in slide-in-from-bottom-4 duration-700 sm:space-y-8 sm:px-6 sm:py-6 lg:px-8 lg:py-8">
+    <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-8 animate-in fade-in slide-in-from-bottom-4 duration-700 sm:px-6 lg:px-8 lg:py-12">
       {/* Header */}
-      <div className="rounded-4xl border border-white/5 bg-linear-to-br from-white/4 to-white/1 p-5 sm:p-7">
-        <div className="mb-2 flex items-center gap-2">
-          <Shield className="text-accent" size={16} />
-          <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Security and Integration</span>
+      <div className="relative overflow-hidden rounded-3xl sm:rounded-4xl border border-white/10 bg-gradient-to-br from-white/5 to-transparent p-6 sm:p-10 backdrop-blur-xl">
+        <div className="relative z-10">
+          <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-white/5 px-3 py-1.5 border border-white/10">
+            <Shield className="text-cyan-400" size={14} />
+            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-300">Workspace Settings</span>
+          </div>
+          <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-5xl mb-4">
+            Configuration
+          </h1>
+          <p className="max-w-2xl text-sm leading-relaxed text-zinc-400 sm:text-base">
+            Configure social destinations, automated schedules, and AI providers for your workspace.
+            We follow a <span className="font-semibold text-white">Bring Your Own Key</span> model to keep full control in your hands.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold tracking-tight text-white sm:text-4xl">
-          Settings
-        </h1>
-        <p className="mt-2 max-w-3xl text-sm text-zinc-400 sm:text-base">
-          Configure social destinations and AI providers for your workspace.
-          Operation Sparta follows a <span className="font-medium text-white">Bring Your Own Key</span> model to keep full control in your hands.
-        </p>
+        <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-cyan-500/10 blur-[80px] pointer-events-none" />
       </div>
 
       <SettingsClient
         initialKeys={userKeys as any}
         integrationData={integrationData || {}}
         userTimezone={rawIntegrationData?.timezone ?? null}
+        userScheduleSlots={rawIntegrationData?.scheduleSlots ?? null}
       />
     </div>
   );

@@ -17,11 +17,13 @@ import {
   RefreshCw,
   Send,
   Trash2,
+  Pencil,
+  Check,
 } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { approveAndPost } from "@/app/actions/publish";
-import { deletePost } from "@/app/actions/projects";
+import { deletePost, updatePost } from "@/app/actions/projects";
 import { toast } from "sonner";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -116,11 +118,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 function PostChip({ post, compact, onClick }: { post: Post; compact?: boolean; onClick: () => void }) {
-  const isInstagram = !!post.instagramPostId || post.source === "upload";
-  const chipColor = isInstagram
+  const isUpload = post.source === "upload";
+  const chipColor = isUpload
     ? "bg-orange-500/20 border-orange-500/30 text-orange-300 hover:bg-orange-500/30"
     : "bg-teal-500/20 border-teal-500/30 text-teal-300 hover:bg-teal-500/30";
-  const Icon = isInstagram ? Instagram : Sparkles;
+  const Icon = isUpload ? Upload : Sparkles;
   const statusDot =
     post.status === "published" ? "bg-green-400"
     : post.status === "pending" ? "bg-amber-400"
@@ -195,13 +197,83 @@ function DayCell({
   );
 }
 
+function EditCaptionModal({ post, onClose, onSaved }: { post: Post; onClose: () => void; onSaved: () => void }) {
+  const [draft, setDraft] = useState(post.caption ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    if (draft === post.caption) { onClose(); return; }
+    setSaving(true);
+    try {
+      const result = await updatePost(post.id, { caption: draft });
+      if (result.success) {
+        toast.success("Caption updated.");
+        onSaved();
+        onClose();
+      } else {
+        toast.error("Failed to save caption", { description: (result as any).error });
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-lg bg-card border border-border rounded-2xl shadow-2xl flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <span className="text-sm font-bold text-foreground flex items-center gap-2">
+            <Pencil size={14} className="text-accent" /> Edit Caption
+          </span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-5">
+          <textarea
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            rows={8}
+            className="w-full rounded-xl border border-border bg-muted/30 px-4 py-3 text-sm text-foreground leading-relaxed resize-none focus:outline-none focus:ring-1 focus:ring-accent"
+            autoFocus
+          />
+          <p className="text-[10px] text-muted-foreground mt-1.5">{draft.length} characters</p>
+        </div>
+        <div className="flex gap-3 px-5 pb-5">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex-1 py-2.5 rounded-xl bg-accent text-accent-foreground font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-accent/20 disabled:opacity-50 transition-all"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
+            Save Caption
+          </button>
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-5 py-2.5 rounded-xl border border-border text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => void; onRefresh: () => void }) {
-  const isInstagram = !!post.instagramPostId || post.source === "upload";
+  const isUpload = post.source === "upload";
+  const isPublished = post.status === "published";
   const [isPending, startTransition] = useTransition();
+  const [editingCaption, setEditingCaption] = useState(false);
 
   const handlePostNow = () => {
     if (!confirm("Are you sure you want to publish this to Instagram immediately?")) return;
-    
+
     startTransition(async () => {
       const result = await approveAndPost(post.id);
       if (result.success) {
@@ -230,6 +302,14 @@ function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => v
   };
 
   return (
+    <>
+    {editingCaption && (
+      <EditCaptionModal
+        post={post}
+        onClose={() => setEditingCaption(false)}
+        onSaved={onRefresh}
+      />
+    )}
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
       <div
         className="relative w-full max-w-sm h-full bg-card border-l border-border flex flex-col shadow-2xl"
@@ -238,12 +318,12 @@ function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => v
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <div className="flex items-center gap-2">
-            {isInstagram
-              ? <Instagram size={16} className="text-orange-400" />
+            {isUpload
+              ? <Upload size={16} className="text-orange-400" />
               : <Sparkles size={16} className="text-teal-400" />
             }
             <span className="text-sm font-bold text-foreground">
-              {isInstagram ? "Instagram Post" : "Studio Post"}
+              {isUpload ? "Uploaded Asset" : "Studio Generated"}
             </span>
           </div>
           <button onClick={onClose} className="text-muted-foreground hover:text-foreground transition-colors">
@@ -284,12 +364,22 @@ function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => v
           )}
 
           {/* Caption */}
-          {post.caption && (
-            <div>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide mb-1">Caption</p>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.caption}</p>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wide">Caption</p>
+              {!isPublished && (
+                <button
+                  onClick={() => setEditingCaption(true)}
+                  className="flex items-center gap-1 text-[10px] text-accent hover:text-accent/80 transition-colors font-semibold"
+                >
+                  <Pencil size={10} /> Edit
+                </button>
+              )}
             </div>
-          )}
+            <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">
+              {post.caption || <span className="text-muted-foreground italic">No caption</span>}
+            </p>
+          </div>
 
           {/* Hashtags */}
           {post.hashtags.length > 0 && (
@@ -321,7 +411,7 @@ function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => v
         </div>
 
         {/* Actions Footer */}
-        {post.status !== "published" && (
+        {!isPublished && (
           <div className="p-5 border-t border-border bg-muted/20 space-y-3">
             <button
               onClick={handlePostNow}
@@ -343,6 +433,7 @@ function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => v
         )}
       </div>
     </div>
+    </>
   );
 }
 
@@ -351,6 +442,7 @@ function PostDrawer({ post, onClose, onRefresh }: { post: Post; onClose: () => v
 export function PlannerClient() {
   const today = new Date();
   const [view, setView] = useState<ViewMode>("month");
+  const [filterType, setFilterType] = useState<"all" | "upload" | "studio">("all");
   const [anchor, setAnchor] = useState(new Date(today));
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
@@ -416,10 +508,15 @@ export function PlannerClient() {
       : `${MONTH_NAMES[s.getMonth()]} – ${MONTH_NAMES[e.getMonth()]} ${e.getFullYear()}`;
   }, [view, anchor]);
 
+  const filteredPosts = useMemo(() => {
+    if (filterType === "all") return posts;
+    return posts.filter(p => p.source === filterType);
+  }, [posts, filterType]);
+
   // Map ISO scheduledFor → day key (local date string)
   const postsByDay = useMemo(() => {
     const map = new Map<string, Post[]>();
-    for (const post of posts) {
+    for (const post of filteredPosts) {
       const key = new Date(post.scheduledFor).toDateString();
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(post);
@@ -428,10 +525,10 @@ export function PlannerClient() {
       dayPosts.sort((a, b) => new Date(a.scheduledFor).getTime() - new Date(b.scheduledFor).getTime());
     }
     return map;
-  }, [posts]);
+  }, [filteredPosts]);
 
-  const scheduled  = posts.filter((p) => p.status === "pending").length;
-  const published  = posts.filter((p) => p.status === "published").length;
+  const scheduled  = filteredPosts.filter((p) => p.status === "pending").length;
+  const published  = filteredPosts.filter((p) => p.status === "published").length;
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
@@ -490,6 +587,21 @@ export function PlannerClient() {
           </div>
 
           <div className="flex items-center gap-3 text-xs">
+            {/* Filter */}
+            <div className="flex rounded-lg border border-border overflow-hidden text-[10px] font-semibold mr-2">
+              {(["all", "upload", "studio"] as const).map((f) => (
+                <button
+                  key={f}
+                  onClick={() => setFilterType(f)}
+                  className={cn(
+                    "px-2.5 py-1.5 capitalize transition-colors",
+                    filterType === f ? "bg-muted text-foreground" : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  {f === "all" ? "All" : f === "upload" ? "Uploads" : "Studio"}
+                </button>
+              ))}
+            </div>
             {loading
               ? <Loader2 size={13} className="animate-spin text-muted-foreground" />
               : (
@@ -568,10 +680,10 @@ export function PlannerClient() {
         {/* Legend */}
         <div className="px-6 py-2.5 border-t border-border flex items-center gap-4 text-[10px] text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-2.5 rounded bg-orange-500/20 border border-orange-500/30" /> Instagram / Upload
+            <span className="w-3 h-2.5 rounded bg-orange-500/20 border border-orange-500/30" /> Uploaded Asset
           </span>
           <span className="flex items-center gap-1.5">
-            <span className="w-3 h-2.5 rounded bg-teal-500/20 border border-teal-500/30" /> Studio Content
+            <span className="w-3 h-2.5 rounded bg-teal-500/20 border border-teal-500/30" /> Studio Generated
           </span>
           <span className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full bg-amber-400" /> Pending

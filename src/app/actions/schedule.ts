@@ -37,6 +37,27 @@ export async function saveUserTimezone(
   }
 }
 
+export async function saveUserSchedule(
+  days: number[],
+  times: { hour: number; minute: number }[]
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    if (!supabase) return { success: false, error: "Auth failed" };
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { success: false, error: "Unauthorized" };
+
+    await db.update(users)
+      .set({ scheduleSlots: { days, times } })
+      .where(eq(users.id, user.id));
+
+    revalidatePath("/settings");
+    return { success: true };
+  } catch (err: unknown) {
+    return { success: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
 export async function autoSchedulePost(postId: string): Promise<
   | { success: true; scheduledFor: string; timezone: string }
   | { success: false; error: string }
@@ -48,7 +69,7 @@ export async function autoSchedulePost(postId: string): Promise<
     if (!user) return { success: false, error: "Unauthorized" };
 
     const [row] = await db
-      .select({ timezone: users.timezone })
+      .select({ timezone: users.timezone, scheduleSlots: users.scheduleSlots })
       .from(users)
       .where(eq(users.id, user.id))
       .limit(1);
@@ -56,7 +77,8 @@ export async function autoSchedulePost(postId: string): Promise<
     if (!row?.timezone) return { success: false, error: "NO_TIMEZONE" };
 
     const timezone = row.timezone;
-    const slot = await findNextSlot(user.id, timezone);
+    const scheduleSlots = row.scheduleSlots;
+    const slot = await findNextSlot(user.id, timezone, scheduleSlots);
 
     await db
       .update(posts)
@@ -73,7 +95,11 @@ export async function autoSchedulePost(postId: string): Promise<
   }
 }
 
-async function findNextSlot(userId: string, timezone: string): Promise<Date> {
+async function findNextSlot(
+  userId: string, 
+  timezone: string, 
+  scheduleSlots?: { days: number[]; times: { hour: number; minute: number }[] } | null
+): Promise<Date> {
   const now = new Date();
   const dateFmt = new Intl.DateTimeFormat("en-CA", {
     timeZone: timezone,
@@ -85,12 +111,28 @@ async function findNextSlot(userId: string, timezone: string): Promise<Date> {
   const todayStr = dateFmt.format(now);
   const [ty, tm, td] = todayStr.split("-").map(Number);
 
-  for (let offset = 0; offset < 8; offset++) {
+  // If user provided a schedule, use it; otherwise fallback to default
+  const allowedDays = scheduleSlots?.days?.length ? scheduleSlots.days : [0, 1, 2, 3, 4, 5, 6];
+  const allowedTimes = scheduleSlots?.times?.length ? scheduleSlots.times : PREFERRED_SLOTS;
+
+  for (let offset = 0; offset < 30; offset++) { // Look ahead up to 30 days
     // Build a midday UTC timestamp for the target day to get the correct TZ date
     const midpoint = new Date(Date.UTC(ty, tm - 1, td + offset, 12, 0, 0));
+    
+    const localDayOfWeek = new Intl.DateTimeFormat("en-US", { timeZone: timezone, weekday: "long" }).format(midpoint);
+    const dayIndexMap: Record<string, number> = { "Sunday": 0, "Monday": 1, "Tuesday": 2, "Wednesday": 3, "Thursday": 4, "Friday": 5, "Saturday": 6 };
+    const currentDayIdx = dayIndexMap[localDayOfWeek];
+
+    if (!allowedDays.includes(currentDayIdx)) {
+      continue; // Skip this day, it's not in the user's preferred days
+    }
+
     const [y, m, d] = dateFmt.format(midpoint).split("-").map(Number);
 
-    for (const { hour, minute } of PREFERRED_SLOTS) {
+    // Sort times so we schedule earlier slots first
+    const sortedTimes = [...allowedTimes].sort((a, b) => (a.hour * 60 + a.minute) - (b.hour * 60 + b.minute));
+
+    for (const { hour, minute } of sortedTimes) {
       const candidate = localToUtc(y, m, d, hour, minute, timezone);
 
       // Must be at least 2 minutes in the future
@@ -118,7 +160,7 @@ async function findNextSlot(userId: string, timezone: string): Promise<Date> {
     }
   }
 
-  throw new Error("No available slot found in the next 7 days.");
+  throw new Error("No available slot found in the next 30 days based on your schedule.");
 }
 
 // Convert a local time (year/month/day/hour/minute in a named timezone) to UTC.
