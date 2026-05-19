@@ -185,29 +185,27 @@ export async function regeneratePost(postId: string, projectId: string, refineme
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) throw new Error("Unauthorized");
 
-    // 1. Create a NEW variant post record
-    const [newPost] = await db.insert(posts).values({
-      projectId,
-      userId: user.id,
-      status: 'generating',
-      caption: `Regenerating...` // Placeholder until n8n returns
-    }).returning();
+    const webhookUrl = process.env.n8n_Regenerate_Webhook;
+    if (!webhookUrl) throw new Error("Regeneration webhook not configured");
 
-    // 2. Fetch context from the "parent" post
-    const [parentPost] = await db.select().from(posts).where(eq(posts.id, postId));
-    const [projectData] = await db.select().from(projects).where(eq(projects.id, projectId));
+    // 1. Fetch project + parent post + prompts in parallel
+    const [[projectData], [parentPost], parentPrompts, userKeys] = await Promise.all([
+      db.select().from(projects).where(and(eq(projects.id, projectId), eq(projects.userId, user.id))),
+      db.select().from(posts).where(and(eq(posts.id, postId), eq(posts.userId, user.id))),
+      db.select().from(prompts).where(eq(prompts.postId, postId)),
+      db.select().from(aiKeys).where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true))),
+    ]);
 
-    // 3. Fetch original image_prompt from prompts table
-    const parentPrompts = await db.select().from(prompts).where(eq(prompts.postId, postId));
-    const originalImagePrompt = parentPrompts[0]?.prompt || "";
+    if (!projectData) throw new Error("Project not found");
+    if (!parentPost) throw new Error("Parent post not found");
 
-    // 4. Fetch AI Keys (all active keys for this user)
-    const userKeys = await db
-      .select()
-      .from(aiKeys)
-      .where(and(eq(aiKeys.userId, user.id), eq(aiKeys.isActive, true)));
+    // Guard: product image required for generation
+    const productUrl = projectData.productImage || projectData.productUrl || "";
+    if (!productUrl) throw new Error("Project has no product image. Upload a product image in project settings before regenerating.");
 
-    // Decrypt keys
+    if (userKeys.length === 0) return { success: false, error: "MISSING_AI_KEY" };
+
+    // 2. Decrypt keys
     let gemini_api_key = "";
     let openai_api_key = "";
     let higgsfield_api_key = "";
@@ -230,36 +228,58 @@ export async function regeneratePost(postId: string, projectId: string, refineme
       }
     }
 
-    // 5. Trigger specialized Regeneration Webhook with NEW postId
-    const webhookUrl = process.env.n8n_Regenerate_Webhook;
-    if (webhookUrl) {
-      await fetch(webhookUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+    // 3. Create placeholder post record
+    const [newPost] = await db.insert(posts).values({
+      projectId,
+      userId: user.id,
+      status: "generating",
+    }).returning();
+
+    // 4. Trigger regeneration webhook
+    let response: Response;
+    try {
+      response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           projectId,
-          projectName: projectData?.name || "Unknown Project",
-          projectDescription: projectData?.productDesc || "",
+          projectName: projectData.name || "",
+          projectDescription: projectData.productDesc || "",
+          product_url: productUrl,
+          product_image: projectData.productImage || "",
+          brand_color: projectData.brandColor || "",
+          brand_tone: projectData.brandVoice || "",
           userId: user.id,
-          postId: newPost.id, // THE NEW ID
+          postId: newPost.id,
           parentPostId: postId,
-          image_prompt: originalImagePrompt,
-          refinementPrompt: refinementPrompt || "Default Regeneration",
+          image_prompt: parentPrompts[0]?.prompt || "",
+          refinementPrompt: refinementPrompt || "",
           selected_provider: selectedProvider || "auto",
           gemini_api_key,
           openai_api_key,
           higgsfield_api_key,
           higgsfield_access_key,
-          currentImageUrl: parentPost?.imageUrl,
-          currentVideoUrl: parentPost?.videoUrl,
-          currentCaption: parentPost?.caption
-        })
+          currentImageUrl: parentPost.imageUrl || "",
+          currentVideoUrl: parentPost.videoUrl || "",
+          currentCaption: parentPost.caption || "",
+        }),
       });
+    } catch (fetchErr: any) {
+      // Webhook unreachable — clean up placeholder
+      await db.delete(posts).where(eq(posts.id, newPost.id));
+      throw new Error(`Could not reach regeneration webhook: ${fetchErr.message}`);
+    }
+
+    if (!response.ok) {
+      // n8n rejected the request — clean up placeholder
+      await db.delete(posts).where(eq(posts.id, newPost.id));
+      throw new Error(`Regeneration webhook returned ${response.status}: ${response.statusText}`);
     }
 
     revalidatePath("/studio");
     return { success: true, newPostId: newPost.id };
   } catch (error: any) {
+    console.error("[regeneratePost]", error.message);
     return { success: false, error: error.message };
   }
 }
