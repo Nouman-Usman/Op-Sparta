@@ -11,15 +11,23 @@ import { createClient } from "@/utils/supabase/server";
 import { revalidatePath } from "next/cache";
 
 const ImageCaptionSchema = z.object({
-  hook: z.string().describe("Opening line (first 125 chars) — must grab attention before the 'more' cutoff."),
-  caption: z.string().describe("Full caption: hook + body. Hashtags placed at END. 150-300 chars total."),
-  hashtags: z.array(z.string()).describe("Highly relevant hashtags without the # symbol."),
-  commentKeywords: z.array(z.string()).max(5).describe("Keywords to post in first comment for SEO — must match the hook/caption topic cluster exactly."),
-  altText: z.string().describe("Accessible image description, 1-2 sentences."),
+  hook: z.string().describe("Opening line, max 125 chars. Appears before Instagram's 'more' fold. Must stop the scroll — use a bold claim, question, or tension that makes the reader NEED to tap 'more'."),
+  caption: z.string().describe("Full marketing caption: Hook → 1-3 sentence value/story body → clear CTA. No hashtags here — placed separately at end. 80-220 words. Line breaks every 2-3 sentences for mobile readability. Strategic emojis allowed."),
+  hashtags: z.array(z.string()).describe("Hashtags without # symbol. Mix: 40% niche (10k-100k posts), 40% mid-tier (100k-1M), 20% broad (1M+). All must match the image topic cluster."),
+  commentKeywords: z.array(z.string()).max(5).describe("3-5 keywords for first comment SEO boost — tightly aligned with caption topic."),
+  altText: z.string().describe("Accessibility alt text, 1-2 sentences describing image content and mood."),
   suggestedPlatform: z.enum(["Instagram", "LinkedIn", "TikTok", "Twitter"]),
 });
 
 export type ImageCaption = z.infer<typeof ImageCaptionSchema>;
+
+const TONE_GUIDE: Record<string, string> = {
+  viral:       "Viral & Punchy — short sentences, bold claims, high-energy. Every word earns its place. Optimised for saves and shares.",
+  educational: "Educational & Deep — teach one specific insight clearly. Use analogies. End with a thought-provoking question that drives comments.",
+  aggressive:  "Aggressive & Bold — confident, direct, zero hedging. Challenge the reader's current thinking. Strong polarising CTA.",
+  minimalist:  "Clean & Minimalist — quiet confidence. Say more with less. One idea, perfectly expressed. No fluff, no emojis.",
+  funny:       "Humorous & Relatable — self-aware, witty, human. Use irony or observation humour. CTA should be playful (e.g. 'Tag your bestie').",
+};
 
 export async function analyzeImageAndGenerate(
   imageUrl: string,
@@ -65,18 +73,28 @@ export async function analyzeImageAndGenerate(
             { type: "image", image: imageBuffer },
             {
               type: "text",
-              text: `You are an expert Instagram growth strategist. Analyze this image and generate viral-ready content.
+              text: `You are a senior Instagram marketing strategist with a track record of 10M+ reach campaigns. Analyze this image and produce conversion-focused content following 2026 best practices.
 
-TONE: Use a ${tone} tone.
-HASHTAGS: Provide exactly ${hashtagCount} hashtags.
+TONE: ${TONE_GUIDE[tone] ?? TONE_GUIDE.viral}
 
-CRITICAL Instagram 2026 rules you MUST follow:
-- Place hashtags at the very end of the caption
-- The hook, caption body, hashtags, and comment keywords MUST share the same topic cluster for SEO alignment
-- Hook must be the first sentence — make it stop-the-scroll worthy
-- Sound human and relatable, never corporate
+HASHTAG RULES:
+- Provide exactly ${hashtagCount} hashtags (no # symbol)
+- Mix: ~40% niche (10k-100k posts), ~40% mid (100k-1M), ~20% broad (1M+)
+- Every hashtag must directly relate to the image subject — no vanity tags (#love, #instagood, #photooftheday)
 
-Generate the caption, hashtags, comment keywords, and alt text now.`,
+CAPTION STRUCTURE (mandatory):
+1. HOOK (first line, ≤125 chars): Bold statement, provocative question, or surprising fact. This is what users see before tapping "more" — make it impossible to ignore.
+2. BODY (2-4 sentences): Deliver value, tell a micro-story, or highlight a specific benefit. Use line breaks every 2-3 sentences. One strategic emoji per paragraph max.
+3. CTA (final line): One clear, specific call-to-action. Match CTA to tone — e.g. "Drop a 🔥 if you agree", "Link in bio →", "Tag someone who needs this", "Save this for later".
+
+MARKETING PRINCIPLES:
+- Lead with the benefit, not the feature
+- Use "you" language to speak directly to the audience
+- Create FOMO, aspiration, or relatability — pick one and commit
+- Never sound corporate or AI-generated
+- Sentence variety: mix short punchy lines with one longer elaboration
+
+OUTPUT: caption field must contain ONLY hook + body + CTA (no hashtags). Hashtags go in the hashtags array only.`,
             },
           ],
         },
