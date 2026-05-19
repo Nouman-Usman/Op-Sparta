@@ -15,7 +15,7 @@ export default async function UploadPage() {
   if (!user) return redirect("/login");
 
   const [userRow] = await db
-    .select({ timezone: users.timezone })
+    .select({ timezone: users.timezone, instagramAccessToken: users.instagramAccessToken })
     .from(users)
     .where(eq(users.id, user.id))
     .limit(1);
@@ -24,6 +24,7 @@ export default async function UploadPage() {
     <UploadClient
       userId={user.id}
       userTimezone={userRow?.timezone ?? null}
+      instagramConnected={!!userRow?.instagramAccessToken}
     />
   );
 }

@@ -75,9 +75,11 @@ type Step = "upload" | "review" | "done";
 export function UploadClient({
   userId,
   userTimezone,
+  instagramConnected,
 }: {
   userId: string;
   userTimezone: string | null;
+  instagramConnected: boolean;
 }) {
   const [step, setStep] = useState<Step>("upload");
   const [localTimezone, setLocalTimezone] = useState(userTimezone);
@@ -246,6 +248,13 @@ export function UploadClient({
 
   const handleApproveAndSchedule = () => {
     if (!resultPostId) return;
+
+    if (!instagramConnected) {
+      toast.error("Instagram not connected", {
+        description: "Connect your Instagram account in Settings before scheduling.",
+      });
+      return;
+    }
 
     if (!localTimezone) {
       setTimezoneModalOpen(true);
@@ -530,19 +539,28 @@ export function UploadClient({
                 >
                   Discard
                 </button>
-                <button
-                  onClick={handleApproveAndSchedule}
-                  disabled={isScheduling}
-                  className="flex-[2] py-3 rounded-lg bg-accent hover:bg-accent/90 text-accent-foreground font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-accent/20"
-                >
-                  {isScheduling ? (
-                    <Loader2 size={16} className="animate-spin" />
-                  ) : (
-                    <>
-                      <Send size={16} /> Approve & Auto-Schedule
-                    </>
+                <div className="flex-[2] flex flex-col gap-1">
+                  <button
+                    onClick={handleApproveAndSchedule}
+                    disabled={isScheduling || !instagramConnected}
+                    className="w-full py-3 rounded-lg bg-accent hover:bg-accent/90 text-accent-foreground font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg shadow-accent/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isScheduling ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <>
+                        <Send size={16} /> Approve & Auto-Schedule
+                      </>
+                    )}
+                  </button>
+                  {!instagramConnected && (
+                    <p className="text-[10px] text-red-400 text-center flex items-center justify-center gap-1">
+                      <AlertTriangle size={10} />
+                      Instagram not connected —{" "}
+                      <a href="/settings" className="underline hover:text-red-300">connect in Settings</a>
+                    </p>
                   )}
-                </button>
+                </div>
               </div>
             </div>
           </div>
